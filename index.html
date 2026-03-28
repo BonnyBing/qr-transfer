@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>码上传递 · 文件转二维码</title>
+  <meta name="description" content="免费将图片、PDF、Word、PPT、Excel、视频、音频、文字转换为二维码，扫码即可下载原文件" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- Background particles -->
+  <div class="bg-particles" id="bgParticles"></div>
+  
+  <!-- Header -->
+  <header class="header">
+    <div class="header-inner">
+      <div class="logo">
+        <div class="logo-icon">
+          <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="2" y="2" width="14" height="14" rx="2" fill="currentColor"/>
+            <rect x="24" y="2" width="14" height="14" rx="2" fill="currentColor"/>
+            <rect x="2" y="24" width="14" height="14" rx="2" fill="currentColor"/>
+            <rect x="6" y="6" width="6" height="6" rx="1" fill="var(--bg-card)"/>
+            <rect x="28" y="6" width="6" height="6" rx="1" fill="var(--bg-card)"/>
+            <rect x="6" y="28" width="6" height="6" rx="1" fill="var(--bg-card)"/>
+            <rect x="24" y="24" width="6" height="6" rx="1" fill="currentColor"/>
+            <rect x="32" y="24" width="6" height="6" rx="1" fill="currentColor"/>
+            <rect x="24" y="32" width="6" height="6" rx="1" fill="currentColor"/>
+            <rect x="32" y="32" width="6" height="6" rx="1" fill="currentColor"/>
+          </svg>
+        </div>
+        <span class="logo-text">码上传递</span>
+      </div>
+      <nav class="nav-pills">
+        <button class="nav-pill active" onclick="switchTab('file')" id="tabFile">文件转码</button>
+        <button class="nav-pill" onclick="switchTab('text')" id="tabText">文字转码</button>
+      </nav>
+      <div class="header-badge">免费&nbsp;·&nbsp;即时&nbsp;·&nbsp;安全</div>
+    </div>
+  </header>
+
+  <!-- Main -->
+  <main class="main">
+    <!-- Hero -->
+    <section class="hero">
+      <h1 class="hero-title">
+        <span class="gradient-text">任何内容</span>，一码传递
+      </h1>
+      <p class="hero-sub">上传文件或输入文字，生成专属二维码，扫码即可直接下载</p>
+      <div class="supported-types">
+        <span class="type-chip"><span class="type-icon">🖼️</span>图片</span>
+        <span class="type-chip"><span class="type-icon">📄</span>PDF</span>
+        <span class="type-chip"><span class="type-icon">📝</span>Word</span>
+        <span class="type-chip"><span class="type-icon">📊</span>Excel</span>
+        <span class="type-chip"><span class="type-icon">📑</span>PPT</span>
+        <span class="type-chip"><span class="type-icon">🎬</span>视频</span>
+        <span class="type-chip"><span class="type-icon">🎵</span>音频</span>
+        <span class="type-chip"><span class="type-icon">💬</span>文字</span>
+      </div>
+    </section>
+
+    <!-- Card -->
+    <section class="card-container">
+      <div class="glass-card" id="mainCard">
+        <!-- FILE TAB -->
+        <div class="tab-content active" id="panelFile">
+          <div class="upload-zone" id="uploadZone">
+            <input type="file" id="fileInput" class="file-input" 
+              accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,.rar" />
+            <div class="upload-icon-wrap">
+              <div class="upload-icon-ring"></div>
+              <div class="upload-icon">
+                <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M32 44V20M32 20L22 30M32 20L42 30" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M16 48H48" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+                  <rect x="4" y="4" width="56" height="56" rx="16" stroke="currentColor" stroke-width="2" stroke-dasharray="4 4"/>
+                </svg>
+              </div>
+            </div>
+            <p class="upload-title">拖拽文件到这里</p>
+            <p class="upload-sub">或者 <span class="upload-link" onclick="document.getElementById('fileInput').click()">点击选择文件</span></p>
+            <p class="upload-limit">支持图片、视频、音频、PDF、Word、Excel、PPT等，最大 100MB</p>
+          </div>
+
+          <!-- File preview -->
+          <div class="file-preview hidden" id="filePreview">
+            <div class="file-preview-inner">
+              <div class="file-icon-wrap" id="fileIconWrap">
+                <span class="file-type-icon" id="fileTypeIcon">📄</span>
+              </div>
+              <div class="file-info">
+                <p class="file-name" id="fileName">—</p>
+                <p class="file-size" id="fileSize">—</p>
+              </div>
+              <button class="remove-btn" id="removeBtn" onclick="clearFile()">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              </button>
+            </div>
+            <div class="img-preview-wrap hidden" id="imgPreviewWrap">
+              <img id="imgPreview" alt="预览" />
+            </div>
+          </div>
+
+          <!-- Options -->
+          <div class="options-row" id="fileOptions">
+            <div class="option-group">
+              <label class="option-label">二维码颜色</label>
+              <div class="color-row">
+                <div class="color-swatch active" data-color="#6C63FF" style="background:#6C63FF" onclick="selectColor(this)"></div>
+                <div class="color-swatch" data-color="#00D2FF" style="background:linear-gradient(135deg,#00D2FF,#3A7BD5)" onclick="selectColor(this)"></div>
+                <div class="color-swatch" data-color="#F857A6" style="background:linear-gradient(135deg,#F857A6,#FF5858)" onclick="selectColor(this)"></div>
+                <div class="color-swatch" data-color="#11998e" style="background:linear-gradient(135deg,#11998e,#38ef7d)" onclick="selectColor(this)"></div>
+                <div class="color-swatch" data-color="#F7971E" style="background:linear-gradient(135deg,#F7971E,#FFD200)" onclick="selectColor(this)"></div>
+                <div class="color-swatch" data-color="#1a1a2e" style="background:#1a1a2e" onclick="selectColor(this)"></div>
+                <input type="color" id="customColor" class="custom-color-input" value="#6C63FF" oninput="customColorChanged(this)" title="自定义颜色" />
+              </div>
+            </div>
+            <div class="option-group">
+              <label class="option-label">尺寸</label>
+              <div class="size-row">
+                <button class="size-btn" data-size="200" onclick="selectSize(this)">小</button>
+                <button class="size-btn active" data-size="280" onclick="selectSize(this)">中</button>
+                <button class="size-btn" data-size="360" onclick="selectSize(this)">大</button>
+              </div>
+            </div>
+          </div>
+
+          <button class="generate-btn" id="generateFileBtn" onclick="handleFileGenerate()">
+            <span class="btn-icon">⚡</span>
+            <span class="btn-text">生成二维码</span>
+          </button>
+        </div>
+
+        <!-- TEXT TAB -->
+        <div class="tab-content" id="panelText">
+          <div class="text-input-wrap">
+            <textarea class="text-input" id="textInput" placeholder="在这里输入任意文字、网址、联系方式...&#10;&#10;扫码后将直接显示内容" maxlength="2000"></textarea>
+            <div class="char-count"><span id="charCount">0</span> / 2000</div>
+          </div>
+
+          <div class="options-row">
+            <div class="option-group">
+              <label class="option-label">二维码颜色</label>
+              <div class="color-row" id="textColorRow">
+                <div class="color-swatch active" data-color="#6C63FF" style="background:#6C63FF" onclick="selectColorText(this)"></div>
+                <div class="color-swatch" data-color="#00D2FF" style="background:linear-gradient(135deg,#00D2FF,#3A7BD5)" onclick="selectColorText(this)"></div>
+                <div class="color-swatch" data-color="#F857A6" style="background:linear-gradient(135deg,#F857A6,#FF5858)" onclick="selectColorText(this)"></div>
+                <div class="color-swatch" data-color="#11998e" style="background:linear-gradient(135deg,#11998e,#38ef7d)" onclick="selectColorText(this)"></div>
+                <div class="color-swatch" data-color="#F7971E" style="background:linear-gradient(135deg,#F7971E,#FFD200)" onclick="selectColorText(this)"></div>
+                <div class="color-swatch" data-color="#1a1a2e" style="background:#1a1a2e" onclick="selectColorText(this)"></div>
+                <input type="color" id="customColorText" class="custom-color-input" value="#6C63FF" oninput="customColorTextChanged(this)" title="自定义颜色" />
+              </div>
+            </div>
+            <div class="option-group">
+              <label class="option-label">尺寸</label>
+              <div class="size-row" id="textSizeRow">
+                <button class="size-btn" data-size="200" onclick="selectSizeText(this)">小</button>
+                <button class="size-btn active" data-size="280" onclick="selectSizeText(this)">中</button>
+                <button class="size-btn" data-size="360" onclick="selectSizeText(this)">大</button>
+              </div>
+            </div>
+          </div>
+
+          <button class="generate-btn" id="generateTextBtn" onclick="handleTextGenerate()">
+            <span class="btn-icon">⚡</span>
+            <span class="btn-text">生成二维码</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- QR Result -->
+      <div class="qr-result hidden" id="qrResult">
+        <div class="qr-card">
+          <div class="qr-glow"></div>
+          <div class="qr-label">你的二维码</div>
+          <div class="qr-box" id="qrBox"></div>
+          <div class="qr-info" id="qrInfo">
+            <div class="qr-info-item">
+              <span class="qr-info-label">内容类型</span>
+              <span class="qr-info-value" id="qrTypeLabel">—</span>
+            </div>
+            <div class="qr-info-item">
+              <span class="qr-info-label">状态</span>
+              <span class="qr-info-value qr-status-ok">✅ 生成成功</span>
+            </div>
+          </div>
+          <div class="qr-actions">
+            <button class="action-btn primary" onclick="downloadQR()">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M12 15V3M12 15l-4-4M12 15l4-4M3 19h18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              下载二维码
+            </button>
+            <button class="action-btn secondary" onclick="copyQRImage()">
+              <svg viewBox="0 0 24 24" fill="none"><rect x="8" y="8" width="12" height="12" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2" stroke="currentColor" stroke-width="2"/></svg>
+              复制图片
+            </button>
+            <button class="action-btn secondary" onclick="resetAll()">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M1 4v6h6M23 20v-6h-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10M23 14l-4.64 4.36A9 9 0 013.51 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              重新生成
+            </button>
+          </div>
+        </div>
+
+        <!-- Scan tip -->
+        <div class="scan-tip">
+          <div class="scan-tip-icon">📱</div>
+          <div>
+            <p class="scan-tip-title">如何使用</p>
+            <p class="scan-tip-desc">打开手机相机或微信扫一扫，对准二维码即可跳转到文件下载页面</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Upload progress overlay -->
+    <div class="progress-overlay hidden" id="progressOverlay">
+      <div class="progress-card">
+        <div class="progress-spinner"></div>
+        <p class="progress-title" id="progressTitle">正在上传文件...</p>
+        <div class="progress-bar-wrap">
+          <div class="progress-bar" id="progressBar"></div>
+        </div>
+        <p class="progress-sub" id="progressSub">请稍候，文件上传中</p>
+      </div>
+    </div>
+  </main>
+
+  <!-- Toast -->
+  <div class="toast hidden" id="toast"></div>
+
+  <!-- Modal for large text QR -->
+  <div class="modal-overlay hidden" id="textQrModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 class="modal-title">文字内容预览</h2>
+        <button class="modal-close" onclick="closeTextModal()">✕</button>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
