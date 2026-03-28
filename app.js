@@ -189,13 +189,14 @@ async function handleFileGenerate() {
 
   try {
     showProgress('正在上传文件...', '连接服务器中，请稍候');
-    const fileUrl = await uploadFile(state.selectedFile);
+    const { url: fileUrl, service } = await uploadFile(state.selectedFile);
     hideProgress();
 
     // 直接用文件 URL 生成二维码，扫码后直接下载，无中间页
     state.currentQRUrl = fileUrl;
     renderQR(fileUrl, state.qrSize, state.qrColor);
     document.getElementById('qrTypeLabel').textContent = getFileTypeName(state.selectedFile);
+    document.getElementById('qrServiceLabel').textContent = service;
     showQRResult();
     showToast('✅ 二维码生成成功！');
   } catch (err) {
@@ -240,18 +241,25 @@ async function handleTextGenerate() {
 async function uploadFile(file) {
   const token = localStorage.getItem('gh_token');
 
-  // ① GitHub API (most reliable in China — uses jsDelivr CDN URL)
+  // ① GitHub API — 如果配置了 Token，优先使用，失败则直接报错（不回退到国内无法访问的外网服务）
   if (token) {
+    setProgress(5, '正在通过 GitHub 上传...');
     try {
-      setProgress(5, '正在通过 GitHub 上传...');
-      return await uploadGitHub(file, token);
+      const url = await uploadGitHub(file, token);
+      return { url, service: 'GitHub jsDelivr CDN' };
     } catch (e) {
-      console.warn('GitHub upload failed:', e.message);
-      showToast('⚠️ GitHub 上传失败，尝试其他方式...');
+      console.error('GitHub upload failed:', e.message);
+      throw new Error(
+        `GitHub 上传失败: ${e.message}\n\n` +
+        `请检查：\n` +
+        `① Token 是否有效（repo 权限）\n` +
+        `② 用户名 / 仓库名是否正确\n` +
+        `③ 文件是否超过 25MB`
+      );
     }
   }
 
-  // ② Anonymous services — 优先返回文件直链的服务（扫码可直接下载）
+  // ② 未配置 Token — 尝试匿名本地化直链服务
   const services = [
     ['catbox.moe',      uploadCatbox],     // 直链 ✓ 永久
     ['litterbox',       uploadLitterbox],  // 直链 ✓ 72h
@@ -265,13 +273,14 @@ async function uploadFile(file) {
   for (const [name, fn] of services) {
     try {
       setProgress(10, `正在上传到 ${name}...`);
-      return await fn(file);
+      const url = await fn(file);
+      return { url, service: name };
     } catch (e) {
       console.warn(name + ' failed:', e.message);
     }
   }
 
-  // 所有匿名服务失败 → 提示用户配置 GitHub Token
+  // 所有匿名服务失败
   throw new Error('NEED_TOKEN');
 }
 
@@ -490,11 +499,12 @@ async function saveTokenAndUpload() {
     btn.disabled = true;
     try {
       showProgress('正在通过 GitHub 上传...', '使用您的 GitHub 仓库存储文件');
-      const fileUrl = await uploadFile(state.selectedFile);
+      const { url: fileUrl, service } = await uploadFile(state.selectedFile);
       hideProgress();
       state.currentQRUrl = fileUrl;
       renderQR(fileUrl, state.qrSize, state.qrColor);
       document.getElementById('qrTypeLabel').textContent = getFileTypeName(state.selectedFile);
+      document.getElementById('qrServiceLabel').textContent = service;
       showQRResult();
       showToast('✅ 二维码生成成功！');
     } catch (err) {
