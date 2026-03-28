@@ -189,13 +189,12 @@ async function handleFileGenerate() {
 
   try {
     showProgress('正在上传文件...', '连接服务器中，请稍候');
-    const url = await uploadFile(state.selectedFile);
+    const fileUrl = await uploadFile(state.selectedFile);
     hideProgress();
 
-    const downloadPageUrl = buildDownloadPageUrl(url, state.selectedFile.name, state.selectedFile.type);
-    state.currentQRUrl = downloadPageUrl;
-
-    renderQR(downloadPageUrl, state.qrSize, state.qrColor);
+    // 直接用文件 URL 生成二维码，扫码后直接下载，无中间页
+    state.currentQRUrl = fileUrl;
+    renderQR(fileUrl, state.qrSize, state.qrColor);
     document.getElementById('qrTypeLabel').textContent = getFileTypeName(state.selectedFile);
     showQRResult();
     showToast('✅ 二维码生成成功！');
@@ -491,11 +490,10 @@ async function saveTokenAndUpload() {
     btn.disabled = true;
     try {
       showProgress('正在通过 GitHub 上传...', '使用您的 GitHub 仓库存储文件');
-      const url = await uploadFile(state.selectedFile);
+      const fileUrl = await uploadFile(state.selectedFile);
       hideProgress();
-      const downloadPageUrl = buildDownloadPageUrl(url, state.selectedFile.name, state.selectedFile.type);
-      state.currentQRUrl = downloadPageUrl;
-      renderQR(downloadPageUrl, state.qrSize, state.qrColor);
+      state.currentQRUrl = fileUrl;
+      renderQR(fileUrl, state.qrSize, state.qrColor);
       document.getElementById('qrTypeLabel').textContent = getFileTypeName(state.selectedFile);
       showQRResult();
       showToast('✅ 二维码生成成功！');
@@ -544,7 +542,7 @@ function renderQR(data, size, color) {
     height: size,
     colorDark: color,
     colorLight: '#ffffff',
-    correctLevel: QRCode.CorrectLevel.M,
+    correctLevel: QRCode.CorrectLevel.L,  // Level L = 最小码点密度，清晰易扫
   });
 }
 
