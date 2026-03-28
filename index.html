@@ -39,7 +39,11 @@
         <button class="nav-pill active" onclick="switchTab('file')" id="tabFile">文件转码</button>
         <button class="nav-pill" onclick="switchTab('text')" id="tabText">文字转码</button>
       </nav>
-      <div class="header-badge">免费&nbsp;·&nbsp;即时&nbsp;·&nbsp;安全</div>
+      <div class="header-badge">
+        <span id="tokenStatusDot" style="display:none;width:7px;height:7px;background:#38ef7d;border-radius:50%;display:none;margin-right:6px;vertical-align:middle"></span>
+        免费&nbsp;·&nbsp;即时&nbsp;·&nbsp;安全
+        <button class="token-setup-btn" onclick="showTokenModal()" title="配置 GitHub 上传（推荐国内用户）">⚙️</button>
+      </div>
     </div>
   </header>
 
@@ -239,6 +243,63 @@
         <button class="modal-close" onclick="closeTextModal()">✕</button>
       </div>
       <div class="modal-body" id="modalBody"></div>
+    </div>
+  </div>
+
+  <!-- GitHub Token Modal -->
+  <div class="modal-overlay hidden" id="tokenModal">
+    <div class="modal-card token-modal-card">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title">🔑 配置 GitHub 上传</h2>
+          <p style="font-size:12px;color:var(--text-muted);margin-top:4px">国内推荐方案 · 文件存储在你的 GitHub 仓库</p>
+        </div>
+        <button class="modal-close" onclick="closeTokenModal()">✕</button>
+      </div>
+      <div class="modal-body" style="padding:0">
+        <!-- Why section -->
+        <div class="token-why">
+          <div class="token-why-item">
+            <span>⚡</span>
+            <span>匿名上传服务在国内可能被屏蔽，GitHub API + jsDelivr CDN 是最可靠的国内方案</span>
+          </div>
+          <div class="token-why-item">
+            <span>🔒</span>
+            <span>文件存在你自己的 GitHub 仓库中，可随时删除，Token 只存在本地浏览器</span>
+          </div>
+          <div class="token-why-item">
+            <span>📦</span>
+            <span>单文件最大 25MB，通过 jsDelivr CDN 加速分发，国内下载速度快</span>
+          </div>
+        </div>
+        <!-- Form -->
+        <div class="token-form">
+          <div class="token-field">
+            <label class="token-label">GitHub 用户名</label>
+            <input id="ghUserInput" class="token-input" type="text" placeholder="BonnyBing" />
+          </div>
+          <div class="token-field">
+            <label class="token-label">仓库名（用于存储文件）</label>
+            <input id="ghRepoInput" class="token-input" type="text" placeholder="qr-transfer" />
+          </div>
+          <div class="token-field">
+            <label class="token-label">
+              Personal Access Token
+              <a href="https://github.com/settings/tokens/new?scopes=repo&description=QR-Transfer" target="_blank" rel="noopener" class="token-help-link">→ 点击创建 Token</a>
+            </label>
+            <input id="ghTokenInput" class="token-input" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" />
+            <p class="token-hint">创建时勾选 <code>repo</code> 权限即可，有效期建议选 90天或1年</p>
+          </div>
+          <div class="token-actions">
+            <button class="token-btn-primary" onclick="saveTokenAndUpload()">
+              ✅ 保存并继续上传
+            </button>
+            <button class="token-btn-danger" onclick="clearGhToken()">
+              🗑️ 清除 Token
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 

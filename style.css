@@ -767,6 +767,120 @@ body {
 .modal-close:hover { background: rgba(255,88,88,0.2); color: var(--danger); }
 .modal-body { padding: 24px; white-space: pre-wrap; font-size: 14px; color: var(--text-sub); line-height: 1.7; max-height: 60vh; overflow-y: auto; }
 
+/* ── Token Setup Button ───────────────────────────── */
+.token-setup-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  margin-left: 6px;
+  opacity: 0.6;
+  transition: opacity var(--transition), transform var(--transition);
+  vertical-align: middle;
+  padding: 0 2px;
+}
+.token-setup-btn:hover { opacity: 1; transform: rotate(30deg); }
+
+/* ── Token Modal ──────────────────────────────────── */
+.token-modal-card { max-width: 520px; }
+.token-why {
+  background: rgba(108,99,255,0.06);
+  border-bottom: 1px solid var(--border);
+  padding: 16px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.token-why-item {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: 13px;
+  color: var(--text-sub);
+  line-height: 1.5;
+}
+.token-why-item > span:first-child { flex-shrink: 0; font-size: 16px; }
+.token-form { padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; }
+.token-field { display: flex; flex-direction: column; gap: 7px; }
+.token-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.token-help-link {
+  color: var(--primary);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.token-help-link:hover { text-decoration: underline; }
+.token-input {
+  padding: 11px 14px;
+  background: rgba(255,255,255,0.04);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  color: var(--text-main);
+  font-family: monospace;
+  font-size: 13px;
+  outline: none;
+  transition: border-color var(--transition), box-shadow var(--transition);
+  width: 100%;
+}
+.token-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(108,99,255,0.15);
+}
+.token-input::placeholder { color: var(--text-muted); font-family: inherit; }
+.token-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+.token-hint code {
+  background: rgba(108,99,255,0.15);
+  color: var(--primary-2);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+.token-actions { display: flex; gap: 10px; padding-top: 4px; }
+.token-btn-primary {
+  flex: 1;
+  padding: 12px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--primary), #9b8aff);
+  border: none;
+  color: #fff;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition);
+  box-shadow: 0 4px 16px var(--primary-glow);
+}
+.token-btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 24px var(--primary-glow); }
+.token-btn-danger {
+  padding: 12px 18px;
+  border-radius: 10px;
+  background: rgba(255,88,88,0.1);
+  border: 1px solid rgba(255,88,88,0.25);
+  color: var(--danger);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition);
+  white-space: nowrap;
+}
+.token-btn-danger:hover { background: rgba(255,88,88,0.2); }
+
 /* ================================================
    Utilities
    ================================================ */

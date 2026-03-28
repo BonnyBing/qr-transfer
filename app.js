@@ -19,6 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initParticles();
   initUploadZone();
   initTextCounter();
+  loadGhToken();
 });
 
 // ── Background Particles ───────────────────────────
@@ -201,7 +202,11 @@ async function handleFileGenerate() {
   } catch (err) {
     hideProgress();
     console.error(err);
-    showToast('❌ ' + (err.message || '上传失败，请重试'));
+    if (err.message === 'NEED_TOKEN') {
+      showTokenModal();
+    } else {
+      showToast('❌ ' + (err.message || '上传失败，请重试'));
+    }
   } finally {
     btn.disabled = false;
   }
@@ -229,73 +234,207 @@ async function handleTextGenerate() {
 
 // ── File Upload ─────────────────────────────────────
 /**
- * Upload using 0x0.st (no CORS issue) with fallback to file.io and then catbox.moe
- * Returns a direct download URL
+ * Try multiple upload services in order.
+ * If GitHub token is saved, use GitHub API first (most reliable in CN).
+ * Throws 'NEED_TOKEN' error when all anonymous services fail → shows token modal.
  */
 async function uploadFile(file) {
-  // Strategy 1: transfer.sh
-  try {
-    return await uploadTransferSh(file);
-  } catch (e1) {
-    console.warn('transfer.sh failed:', e1.message);
+  const token = localStorage.getItem('gh_token');
+
+  // ① GitHub API (most reliable in China — uses jsDelivr CDN URL)
+  if (token) {
+    try {
+      setProgress(5, '正在通过 GitHub 上传...');
+      return await uploadGitHub(file, token);
+    } catch (e) {
+      console.warn('GitHub upload failed:', e.message);
+      showToast('⚠️ GitHub 上传失败，尝试其他方式...');
+    }
   }
-  // Strategy 2: 0x0.st
-  try {
-    return await upload0x0(file);
-  } catch (e2) {
-    console.warn('0x0.st failed:', e2.message);
+
+  // ② Anonymous services (international — may be blocked in China)
+  const services = [
+    ['gofile.io',       uploadGofile],
+    ['catbox.moe',      uploadCatbox],
+    ['litterbox',       uploadLitterbox],
+    ['uguu.se',         uploadUguu],
+    ['file.io',         uploadFileIo],
+    ['0x0.st',          upload0x0],
+    ['transfer.sh',     uploadTransferSh],
+  ];
+
+  for (const [name, fn] of services) {
+    try {
+      setProgress(10, `正在上传到 ${name}...`);
+      return await fn(file);
+    } catch (e) {
+      console.warn(name + ' failed:', e.message);
+    }
   }
-  // Strategy 3: file.io
-  try {
-    return await uploadFileIo(file);
-  } catch (e3) {
-    console.warn('file.io failed:', e3.message);
-    throw new Error('所有上传服务均不可用，请检查网络连接后重试');
-  }
+
+  // 所有匿名服务失败 → 提示用户配置 GitHub Token
+  throw new Error('NEED_TOKEN');
 }
 
-async function uploadTransferSh(file) {
-  setProgress(20, '正在上传到 transfer.sh...');
-  const safeFilename = encodeURIComponent(file.name.replace(/\s+/g, '_'));
+// ── GitHub API Upload (推荐：国内可用) ─────────────────
+async function uploadGitHub(file, token) {
+  // 25MB limit for base64 GitHub API
+  if (file.size > 25 * 1024 * 1024) {
+    throw new Error('文件超过 25MB，无法通过 GitHub API 上传');
+  }
+  const base64 = await fileToBase64(file);
+  const timestamp = Date.now();
+  const safeName = file.name.replace(/[^\w.-]/g, '_');
+  const path = `uploads/${timestamp}_${safeName}`;
+
+  const ghUser = localStorage.getItem('gh_user') || 'BonnyBing';
+  const ghRepo = localStorage.getItem('gh_repo') || 'qr-transfer';
+
+  setProgress(30, '正在上传到 GitHub...');
   const resp = await fetchWithTimeout(
-    `https://transfer.sh/${safeFilename}`,
+    `https://api.github.com/repos/${ghUser}/${ghRepo}/contents/${path}`,
     {
       method: 'PUT',
-      body: file,
-      headers: { 'Max-Days': '14' },
+      headers: {
+        'Authorization': `token ${token}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/vnd.github.v3+json',
+      },
+      body: JSON.stringify({
+        message: `Upload: ${file.name}`,
+        content: base64,
+      }),
     },
-    60000
+    90000
   );
-  if (!resp.ok) throw new Error(`transfer.sh HTTP ${resp.status}`);
-  const url = (await resp.text()).trim();
-  if (!url.startsWith('http')) throw new Error('transfer.sh 返回无效链接');
-  setProgress(100, '上传完成！');
-  return url;
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(err.message || `GitHub API 错误 ${resp.status}`);
+  }
+  setProgress(95, '生成下载链接...');
+  // jsDelivr 在国内可访问，用它作为下载 CDN
+  return `https://cdn.jsdelivr.net/gh/${ghUser}/${ghRepo}@main/${path}`;
 }
 
-async function upload0x0(file) {
-  setProgress(10, '正在上传到 0x0.st...');
+async function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+// ── Gofile.io ──────────────────────────────────────
+async function uploadGofile(file) {
+  // Step 1: get best server
+  const serverResp = await fetchWithTimeout('https://api.gofile.io/servers', {}, 10000);
+  if (!serverResp.ok) throw new Error('gofile server list failed');
+  const serverJson = await serverResp.json();
+  const server = serverJson?.data?.servers?.[0]?.name;
+  if (!server) throw new Error('gofile no server');
+
+  // Step 2: upload
   const form = new FormData();
   form.append('file', file);
-  const resp = await fetchWithTimeout('https://0x0.st', { method: 'POST', body: form }, 60000);
-  if (!resp.ok) throw new Error(`0x0.st HTTP ${resp.status}`);
+  const resp = await fetchWithTimeout(
+    `https://${server}.gofile.io/contents/uploadfile`,
+    { method: 'POST', body: form },
+    90000
+  );
+  if (!resp.ok) throw new Error(`gofile HTTP ${resp.status}`);
+  const json = await resp.json();
+  if (json.status !== 'ok') throw new Error('gofile: ' + json.message);
+  const link = json.data?.downloadPage || json.data?.directLink;
+  if (!link) throw new Error('gofile no link');
+  setProgress(100, '上传完成！');
+  return link;
+}
+
+// ── Catbox.moe (permanent) ─────────────────────────
+async function uploadCatbox(file) {
+  if (file.size > 200 * 1024 * 1024) throw new Error('catbox: file > 200MB');
+  const form = new FormData();
+  form.append('reqtype', 'fileupload');
+  form.append('fileToUpload', file);
+  const resp = await fetchWithTimeout('https://catbox.moe/user/api.php', { method: 'POST', body: form }, 90000);
+  if (!resp.ok) throw new Error(`catbox HTTP ${resp.status}`);
   const url = (await resp.text()).trim();
-  if (!url.startsWith('http')) throw new Error('0x0.st 返回无效链接');
+  if (!url.startsWith('http')) throw new Error('catbox invalid response');
   setProgress(100, '上传完成！');
   return url;
 }
 
+// ── Litterbox (72h temp) ───────────────────────────
+async function uploadLitterbox(file) {
+  const form = new FormData();
+  form.append('reqtype', 'fileupload');
+  form.append('time', '72h');
+  form.append('fileToUpload', file);
+  const resp = await fetchWithTimeout(
+    'https://litterbox.catbox.moe/resources/internals/api.php',
+    { method: 'POST', body: form },
+    90000
+  );
+  if (!resp.ok) throw new Error(`litterbox HTTP ${resp.status}`);
+  const url = (await resp.text()).trim();
+  if (!url.startsWith('http')) throw new Error('litterbox invalid response');
+  setProgress(100, '上传完成！');
+  return url;
+}
+
+// ── Uguu.se (48h) ─────────────────────────────────
+async function uploadUguu(file) {
+  if (file.size > 100 * 1024 * 1024) throw new Error('uguu: file > 100MB');
+  const form = new FormData();
+  form.append('files[]', file);
+  const resp = await fetchWithTimeout('https://uguu.se/upload', { method: 'POST', body: form }, 90000);
+  if (!resp.ok) throw new Error(`uguu HTTP ${resp.status}`);
+  const json = await resp.json();
+  const url = json?.files?.[0]?.url;
+  if (!url) throw new Error('uguu no url');
+  setProgress(100, '上传完成！');
+  return url;
+}
+
+// ── file.io ────────────────────────────────────────
 async function uploadFileIo(file) {
-  setProgress(10, '正在上传到 file.io...');
   const form = new FormData();
   form.append('file', file);
   form.append('expiry', '14d');
   const resp = await fetchWithTimeout('https://file.io', { method: 'POST', body: form }, 60000);
   if (!resp.ok) throw new Error(`file.io HTTP ${resp.status}`);
   const json = await resp.json();
-  if (!json.success || !json.link) throw new Error('file.io 返回失败：' + (json.message || ''));
+  if (!json.success || !json.link) throw new Error('file.io: ' + (json.message || 'failed'));
   setProgress(100, '上传完成！');
   return json.link;
+}
+
+// ── 0x0.st ────────────────────────────────────────
+async function upload0x0(file) {
+  const form = new FormData();
+  form.append('file', file);
+  const resp = await fetchWithTimeout('https://0x0.st', { method: 'POST', body: form }, 60000);
+  if (!resp.ok) throw new Error(`0x0.st HTTP ${resp.status}`);
+  const url = (await resp.text()).trim();
+  if (!url.startsWith('http')) throw new Error('0x0.st invalid response');
+  setProgress(100, '上传完成！');
+  return url;
+}
+
+// ── transfer.sh ────────────────────────────────────
+async function uploadTransferSh(file) {
+  const safeFilename = encodeURIComponent(file.name.replace(/\s+/g, '_'));
+  const resp = await fetchWithTimeout(
+    `https://transfer.sh/${safeFilename}`,
+    { method: 'PUT', body: file, headers: { 'Max-Days': '14' } },
+    60000
+  );
+  if (!resp.ok) throw new Error(`transfer.sh HTTP ${resp.status}`);
+  const url = (await resp.text()).trim();
+  if (!url.startsWith('http')) throw new Error('transfer.sh invalid response');
+  setProgress(100, '上传完成！');
+  return url;
 }
 
 function fetchWithTimeout(url, options, timeout) {
@@ -309,6 +448,73 @@ function fetchWithTimeout(url, options, timeout) {
       .then(r => { clearTimeout(timer); resolve(r); })
       .catch(e => { clearTimeout(timer); reject(e); });
   });
+}
+
+// ── GitHub Token Modal ─────────────────────────────
+function showTokenModal() {
+  hideProgress();
+  document.getElementById('tokenModal').classList.remove('hidden');
+  // pre-fill saved values
+  const saved = localStorage.getItem('gh_token');
+  if (saved) document.getElementById('ghTokenInput').value = saved;
+  document.getElementById('ghUserInput').value = localStorage.getItem('gh_user') || 'BonnyBing';
+  document.getElementById('ghRepoInput').value = localStorage.getItem('gh_repo') || 'qr-transfer';
+}
+
+function closeTokenModal() {
+  document.getElementById('tokenModal').classList.add('hidden');
+}
+
+function loadGhToken() {
+  const token = localStorage.getItem('gh_token');
+  const indicator = document.getElementById('tokenStatusDot');
+  if (indicator) indicator.style.display = token ? 'inline-block' : 'none';
+}
+
+async function saveTokenAndUpload() {
+  const token = document.getElementById('ghTokenInput').value.trim();
+  const user  = document.getElementById('ghUserInput').value.trim();
+  const repo  = document.getElementById('ghRepoInput').value.trim();
+
+  if (!token) { showToast('⚠️ 请输入 GitHub Token'); return; }
+  if (!user || !repo) { showToast('⚠️ 请填写用户名和仓库名'); return; }
+
+  localStorage.setItem('gh_token', token);
+  localStorage.setItem('gh_user', user);
+  localStorage.setItem('gh_repo', repo);
+  loadGhToken();
+  closeTokenModal();
+
+  // Retry upload with the new token
+  if (state.selectedFile) {
+    const btn = document.getElementById('generateFileBtn');
+    btn.disabled = true;
+    try {
+      showProgress('正在通过 GitHub 上传...', '使用您的 GitHub 仓库存储文件');
+      const url = await uploadFile(state.selectedFile);
+      hideProgress();
+      const downloadPageUrl = buildDownloadPageUrl(url, state.selectedFile.name, state.selectedFile.type);
+      state.currentQRUrl = downloadPageUrl;
+      renderQR(downloadPageUrl, state.qrSize, state.qrColor);
+      document.getElementById('qrTypeLabel').textContent = getFileTypeName(state.selectedFile);
+      showQRResult();
+      showToast('✅ 二维码生成成功！');
+    } catch (err) {
+      hideProgress();
+      showToast('❌ ' + (err.message || '上传失败'));
+    } finally {
+      btn.disabled = false;
+    }
+  }
+}
+
+function clearGhToken() {
+  localStorage.removeItem('gh_token');
+  localStorage.removeItem('gh_user');
+  localStorage.removeItem('gh_repo');
+  loadGhToken();
+  showToast('🗑️ GitHub Token 已清除');
+  closeTokenModal();
 }
 
 // ── Download Page URL ──────────────────────────────
