@@ -251,15 +251,15 @@ async function uploadFile(file) {
     }
   }
 
-  // ② Anonymous services (international — may be blocked in China)
+  // ② Anonymous services — 优先返回文件直链的服务（扫码可直接下载）
   const services = [
-    ['gofile.io',       uploadGofile],
-    ['catbox.moe',      uploadCatbox],
-    ['litterbox',       uploadLitterbox],
-    ['uguu.se',         uploadUguu],
-    ['file.io',         uploadFileIo],
-    ['0x0.st',          upload0x0],
-    ['transfer.sh',     uploadTransferSh],
+    ['catbox.moe',      uploadCatbox],     // 直链 ✓ 永久
+    ['litterbox',       uploadLitterbox],  // 直链 ✓ 72h
+    ['uguu.se',         uploadUguu],       // 直链 ✓ 48h
+    ['file.io',         uploadFileIo],     // 直链 ✓ 14d
+    ['0x0.st',          upload0x0],        // 直链 ✓
+    ['transfer.sh',     uploadTransferSh], // 直链 ✓
+    ['gofile.io',       uploadGofile],     // 页面链接，放最后
   ];
 
   for (const [name, fn] of services) {
