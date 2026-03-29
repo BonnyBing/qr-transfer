@@ -549,31 +549,53 @@ function buildDownloadPageUrl(fileUrl, fileName, mimeType) {
 let qrInstance = null;
 
 function renderQR(data, size, color) {
-  // QR 各纠错级别最大字节数（字母数字模式）
-  // L: ~1268 bytes, M: ~1000, Q: ~718, H: ~551（Version 40）
-  // 这里用保守值做判断，以字节长度近似
+  // QR Version 40 二进制模式各纠错级别实际字节上限：
+  // L: 1088  M: 858  Q: 608  H: 468
   const byteLen = new TextEncoder().encode(data).length;
 
+  // 按实际上限选最低（最稀疏）的可用级别
   let level;
-  if      (byteLen <= 1000) level = QRCode.CorrectLevel.L;
-  else if (byteLen <= 1500) level = QRCode.CorrectLevel.M;
-  else if (byteLen <= 2000) level = QRCode.CorrectLevel.Q;
+  if      (byteLen <= 1088) level = QRCode.CorrectLevel.L;
+  else if (byteLen <= 858)  level = QRCode.CorrectLevel.M; // 不会到这里，保留结构
+  else if (byteLen <= 1748) level = QRCode.CorrectLevel.M;
+  else if (byteLen <= 2536) level = QRCode.CorrectLevel.Q;
   else if (byteLen <= 2953) level = QRCode.CorrectLevel.H;
   else {
-    showToast('❌ 链接过长，无法生成二维码，请换用短链接服务');
+    showToast('❌ 链接过长（>' + byteLen + '字节），无法生成二维码');
     throw new Error('QR data too long: ' + byteLen + ' bytes');
   }
 
   const box = document.getElementById('qrBox');
   box.innerHTML = '';
-  qrInstance = new QRCode(box, {
-    text: data,
-    width: size,
-    height: size,
-    colorDark: color,
-    colorLight: '#ffffff',
-    correctLevel: level,
-  });
+
+  // 用 try/catch 兜底：若当前级别仍 overflow，自动升级到下一级重试
+  const levels = [
+    QRCode.CorrectLevel.L,
+    QRCode.CorrectLevel.M,
+    QRCode.CorrectLevel.Q,
+    QRCode.CorrectLevel.H,
+  ];
+  let startIdx = levels.indexOf(level);
+  for (let i = startIdx; i < levels.length; i++) {
+    try {
+      box.innerHTML = '';
+      qrInstance = new QRCode(box, {
+        text: data,
+        width: size,
+        height: size,
+        colorDark: color,
+        colorLight: '#ffffff',
+        correctLevel: levels[i],
+      });
+      return; // 成功则退出
+    } catch (e) {
+      if (i === levels.length - 1) {
+        showToast('❌ 链接过长，无法生成二维码，请缩短链接');
+        throw e;
+      }
+      // 继续尝试更高纠错级别
+    }
+  }
 }
 
 // ── QR Actions ─────────────────────────────────────
