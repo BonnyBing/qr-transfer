@@ -328,8 +328,12 @@ async function uploadGitHub(file, token) {
     throw new Error(err.message || `GitHub API 错误 ${resp.status}`);
   }
   setProgress(95, '生成下载链接...');
-  // jsDelivr 在国内可访问，用它作为下载 CDN
-  return `https://cdn.jsdelivr.net/gh/${ghUser}/${ghRepo}@main/${path}`;
+  const json = await resp.json().catch(() => ({}));
+  // 优先用 API 返回的 download_url（raw.githubusercontent.com 直链，无 CDN 限制）
+  // 备用：手拼 jsDelivr URL（要求仓库为 public）
+  const downloadUrl = json?.content?.download_url
+    || `https://cdn.jsdelivr.net/gh/${ghUser}/${ghRepo}@main/${path}`;
+  return downloadUrl;
 }
 
 async function fileToBase64(file) {
