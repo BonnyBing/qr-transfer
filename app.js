@@ -292,11 +292,13 @@ async function uploadGitHub(file, token) {
     showToast(`⚠️ 文件较大（${formatBytes(file.size)}），上传可能较慢，请耐心等待...`);
   }
   const base64 = await fileToBase64(file);
-  const timestamp = Date.now();
-  // 用 "uploads/时间戳/原始文件名" 结构，这样 jsDelivr URL 末尾就是原始文件名
-  // 浏览器下载时会自动用它作为文件名，无需中间跳转页
+  // 用 HHMMSS（时分秒）作为文件夹名，比毫秒时间戳短 7 位，有效缩短 URL
+  const now = new Date();
+  const timeSlot = now.getHours().toString().padStart(2, '0')
+                 + now.getMinutes().toString().padStart(2, '0')
+                 + now.getSeconds().toString().padStart(2, '0');
   const safeName = file.name.replace(/[^\w.\u4e00-\u9fa5-]/g, '_'); // 保留中文、字母、数字、点、连字符
-  const path = `uploads/${timestamp}/${safeName}`;
+  const path = `uploads/${timeSlot}/${safeName}`;
 
   const ghUser = localStorage.getItem('gh_user') || 'BonnyBing';
   const ghRepo = localStorage.getItem('gh_repo') || 'qr-transfer';
@@ -547,6 +549,21 @@ function buildDownloadPageUrl(fileUrl, fileName, mimeType) {
 let qrInstance = null;
 
 function renderQR(data, size, color) {
+  // QR 各纠错级别最大字节数（字母数字模式）
+  // L: ~1268 bytes, M: ~1000, Q: ~718, H: ~551（Version 40）
+  // 这里用保守值做判断，以字节长度近似
+  const byteLen = new TextEncoder().encode(data).length;
+
+  let level;
+  if      (byteLen <= 1000) level = QRCode.CorrectLevel.L;
+  else if (byteLen <= 1500) level = QRCode.CorrectLevel.M;
+  else if (byteLen <= 2000) level = QRCode.CorrectLevel.Q;
+  else if (byteLen <= 2953) level = QRCode.CorrectLevel.H;
+  else {
+    showToast('❌ 链接过长，无法生成二维码，请换用短链接服务');
+    throw new Error('QR data too long: ' + byteLen + ' bytes');
+  }
+
   const box = document.getElementById('qrBox');
   box.innerHTML = '';
   qrInstance = new QRCode(box, {
@@ -555,7 +572,7 @@ function renderQR(data, size, color) {
     height: size,
     colorDark: color,
     colorLight: '#ffffff',
-    correctLevel: QRCode.CorrectLevel.L,  // Level L = 最小码点密度，清晰易扫
+    correctLevel: level,
   });
 }
 
