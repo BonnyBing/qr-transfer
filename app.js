@@ -104,11 +104,6 @@ function formatBytes(bytes) {
 }
 
 function selectFile(file) {
-  // Size check: 100 MB
-  if (file.size > 100 * 1024 * 1024) {
-    showToast('❌ 文件超过 100MB 限制，请选择更小的文件');
-    return;
-  }
   state.selectedFile = file;
   document.getElementById('uploadZone').classList.add('hidden');
   const preview = document.getElementById('filePreview');
@@ -286,9 +281,9 @@ async function uploadFile(file) {
 
 // ── GitHub API Upload (推荐：国内可用) ─────────────────
 async function uploadGitHub(file, token) {
-  // 25MB limit for base64 GitHub API
-  if (file.size > 25 * 1024 * 1024) {
-    throw new Error('文件超过 25MB，无法通过 GitHub API 上传');
+  // 大文件给出提示但不阻止（GitHub API 实际支持约 50MB）
+  if (file.size > 30 * 1024 * 1024) {
+    showToast(`⚠️ 文件较大（${formatBytes(file.size)}），上传可能较慢，请耐心等待...`);
   }
   const base64 = await fileToBase64(file);
   const timestamp = Date.now();
