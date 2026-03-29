@@ -236,21 +236,27 @@ async function handleTextGenerate() {
 async function uploadFile(file) {
   const token = localStorage.getItem('gh_token');
 
-  // ① GitHub API — 如果配置了 Token，优先使用，失败则直接报错（不回退到国内无法访问的外网服务）
+  // ① GitHub API — 配置了 Token 则优先使用
   if (token) {
     setProgress(5, '正在通过 GitHub 上传...');
     try {
       const url = await uploadGitHub(file, token);
       return { url, service: 'GitHub jsDelivr CDN' };
     } catch (e) {
-      console.error('GitHub upload failed:', e.message);
-      throw new Error(
-        `GitHub 上传失败: ${e.message}\n\n` +
-        `请检查：\n` +
-        `① Token 是否有效（repo 权限）\n` +
-        `② 用户名 / 仓库名是否正确\n` +
-        `③ 文件是否超过 25MB`
-      );
+      const isNetworkError = e instanceof TypeError || e.message.includes('fetch') || e.message.includes('network') || e.message.includes('超时');
+      if (isNetworkError) {
+        // 网络层面无法访问 GitHub API → 回退到匿名服务
+        console.warn('GitHub API 网络不可达，尝试匿名服务:', e.message);
+        showToast('⚠️ GitHub API 被拦截，尝试其他上传服务...');
+      } else {
+        // Token / 仓库配置错误 → 直接报错，不要回退
+        throw new Error(
+          `GitHub 上传失败: ${e.message}\n\n` +
+          `请在 ⚙️ 中检查：\n` +
+          `① Token 是否有效（repo 权限）\n` +
+          `② 用户名 / 仓库名是否正确`
+        );
+      }
     }
   }
 
@@ -275,7 +281,7 @@ async function uploadFile(file) {
     }
   }
 
-  // 所有匿名服务失败
+  // 所有服务均失败 → 提示网络问题
   throw new Error('NEED_TOKEN');
 }
 
