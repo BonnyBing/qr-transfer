@@ -327,13 +327,36 @@ async function uploadGitHub(file, token) {
     const err = await resp.json().catch(() => ({}));
     throw new Error(err.message || `GitHub API 错误 ${resp.status}`);
   }
-  setProgress(95, '生成下载链接...');
   await resp.json().catch(() => ({})); // consume body
-  // 使用 GitHub Pages URL：微信能正确识别为文件链接
-  //   → 安卓：弹"即将离开微信，在浏览器打开"
-  //   → iOS：图片/PDF 直接内联预览
-  // 要求：仓库为 public 且已开启 GitHub Pages（gh-pages / main branch）
-  return `https://${ghUser}.github.io/${ghRepo}/${path}`;
+
+  const pagesUrl = `https://${ghUser}.github.io/${ghRepo}/${path}`;
+
+  // GitHub Pages 部署需要约 30s~2min，轮询等待文件真正可访问
+  setProgress(95, '等待 GitHub Pages 部署...');
+  await waitForPagesDeploy(pagesUrl);
+
+  setProgress(100, '文件已就绪！');
+  return pagesUrl;
+}
+
+/**
+ * 每 6 秒发一次 HEAD 请求，最多等 3 分钟。
+ * 返回时文件已可访问，否则抛出超时错误。
+ */
+async function waitForPagesDeploy(url, maxMs = 180000, intervalMs = 6000) {
+  const deadline = Date.now() + maxMs;
+  let elapsed = 0;
+  while (Date.now() < deadline) {
+    try {
+      const r = await fetch(url, { method: 'HEAD', cache: 'no-store' });
+      if (r.ok) return; // 文件已上线
+    } catch (_) { /* 网络波动，继续等 */ }
+    const waited = Math.round(elapsed / 1000);
+    setProgress(95, `等待 GitHub Pages 部署... (${waited}s)`);
+    await new Promise(res => setTimeout(res, intervalMs));
+    elapsed += intervalMs;
+  }
+  throw new Error('GitHub Pages 部署超时（>3分钟），请稍后扫码重试');
 }
 
 async function fileToBase64(file) {
