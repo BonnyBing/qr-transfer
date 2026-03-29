@@ -292,13 +292,16 @@ async function uploadGitHub(file, token) {
     showToast(`⚠️ 文件较大（${formatBytes(file.size)}），上传可能较慢，请耐心等待...`);
   }
   const base64 = await fileToBase64(file);
-  // 用 HHMMSS（时分秒）作为文件夹名，比毫秒时间戳短 7 位，有效缩短 URL
+  // 文件名只保留 ASCII 扩展名，主名用时分秒，彻底避免中文/乱码/Forbidden
   const now = new Date();
   const timeSlot = now.getHours().toString().padStart(2, '0')
                  + now.getMinutes().toString().padStart(2, '0')
                  + now.getSeconds().toString().padStart(2, '0');
-  const safeName = file.name.replace(/[^\w.\u4e00-\u9fa5-]/g, '_'); // 保留中文、字母、数字、点、连字符
-  const path = `uploads/${timeSlot}/${safeName}`;
+  const rawExt = file.name.includes('.')
+    ? file.name.slice(file.name.lastIndexOf('.')).toLowerCase().replace(/[^a-z0-9.]/g, '')
+    : '';
+  const safeName = timeSlot + rawExt;          // e.g. "135027.pdf"
+  const path = `uploads/${safeName}`;
 
   const ghUser = localStorage.getItem('gh_user') || 'BonnyBing';
   const ghRepo = localStorage.getItem('gh_repo') || 'qr-transfer';
