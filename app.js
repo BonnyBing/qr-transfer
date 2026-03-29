@@ -187,7 +187,7 @@ async function handleFileGenerate() {
     const { url: fileUrl, service } = await uploadFile(state.selectedFile);
     hideProgress();
 
-    // 直接用文件 URL 生成二维码，扫码后直接下载，无中间页
+    // 直接用文件 URL 生成二维码，扫码后直接下载
     state.currentQRUrl = fileUrl;
     renderQR(fileUrl, state.qrSize, state.qrColor);
     document.getElementById('qrTypeLabel').textContent = getFileTypeName(state.selectedFile);
@@ -328,12 +328,12 @@ async function uploadGitHub(file, token) {
     throw new Error(err.message || `GitHub API 错误 ${resp.status}`);
   }
   setProgress(95, '生成下载链接...');
-  const json = await resp.json().catch(() => ({}));
-  // 优先用 API 返回的 download_url（raw.githubusercontent.com 直链，无 CDN 限制）
-  // 备用：手拼 jsDelivr URL（要求仓库为 public）
-  const downloadUrl = json?.content?.download_url
-    || `https://cdn.jsdelivr.net/gh/${ghUser}/${ghRepo}@main/${path}`;
-  return downloadUrl;
+  await resp.json().catch(() => ({})); // consume body
+  // 使用 GitHub Pages URL：微信能正确识别为文件链接
+  //   → 安卓：弹"即将离开微信，在浏览器打开"
+  //   → iOS：图片/PDF 直接内联预览
+  // 要求：仓库为 public 且已开启 GitHub Pages（gh-pages / main branch）
+  return `https://${ghUser}.github.io/${ghRepo}/${path}`;
 }
 
 async function fileToBase64(file) {
@@ -540,14 +540,14 @@ function clearGhToken() {
 // ── Download Page URL ──────────────────────────────
 /**
  * Build a self-hosted download page URL via hash params.
- * The QR code links to this page with the file URL encoded.
+ * The QR code links to download.html which handles WeChat guidance + auto-download.
  */
 function buildDownloadPageUrl(fileUrl, fileName, mimeType) {
   const base = window.location.href.replace(/\/[^/]*$/, '/download.html');
   const params = new URLSearchParams({
-    url: fileUrl,
-    name: fileName,
-    type: mimeType || '',
+    url: encodeURIComponent(fileUrl),
+    name: encodeURIComponent(fileName || ''),
+    type: encodeURIComponent(mimeType || ''),
   });
   return `${base}#${params.toString()}`;
 }
