@@ -292,8 +292,10 @@ async function uploadGitHub(file, token) {
   }
   const base64 = await fileToBase64(file);
   const timestamp = Date.now();
-  const safeName = file.name.replace(/[^\w.-]/g, '_');
-  const path = `uploads/${timestamp}_${safeName}`;
+  // 用 "uploads/时间戳/原始文件名" 结构，这样 jsDelivr URL 末尾就是原始文件名
+  // 浏览器下载时会自动用它作为文件名，无需中间跳转页
+  const safeName = file.name.replace(/[^\w.\u4e00-\u9fa5-]/g, '_'); // 保留中文、字母、数字、点、连字符
+  const path = `uploads/${timestamp}/${safeName}`;
 
   const ghUser = localStorage.getItem('gh_user') || 'BonnyBing';
   const ghRepo = localStorage.getItem('gh_repo') || 'qr-transfer';
