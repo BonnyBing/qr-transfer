@@ -264,7 +264,7 @@ function handleInvoiceGenerate() {
 
   state.currentQRUrl = pageUrl;
   renderQR(pageUrl, state.qrSizeInvoice, state.qrColorInvoice);
-  setTimeout(() => addInvoiceTaxWatermark(), 80);
+  setTimeout(() => addInvoiceTaxWatermark(10), 50);
 
   document.getElementById('qrTypeLabel').textContent = '\u53d1\u7968\u4fe1\u606f';
   document.getElementById('qrServiceLabel').textContent = '\u672c\u5730\u7f16\u7801';
@@ -272,10 +272,14 @@ function handleInvoiceGenerate() {
   showToast('\u2705 \u53d1\u7968\u4e8c\u7ef4\u7801\u751f\u6210\u6210\u529f\uff01');
 }
 
-function addInvoiceTaxWatermark() {
+function addInvoiceTaxWatermark(retries) {
+  retries = (retries === undefined) ? 10 : retries;
   const box    = document.getElementById('qrBox');
-  const canvas = box.querySelector('canvas');
-  if (!canvas) return;
+  const canvas = box ? box.querySelector('canvas') : null;
+  if (!canvas) {
+    if (retries > 0) setTimeout(() => addInvoiceTaxWatermark(retries - 1), 100);
+    return;
+  }
   const size = canvas.width;
   const ctx  = canvas.getContext('2d');
   const fontSize = Math.round(size * 0.18);

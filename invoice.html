@@ -13,9 +13,9 @@
 
     html, body {
       height: 100%;
-      font-family: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-      background: #f5f5f5;
-      color: #222;
+      font-family: 'STKaiti', 'KaiTi', '楷体', 'Noto Sans SC', serif;
+      background: #fff;
+      color: #000;
     }
 
     /* ── 顶部状态栏占位（仿微信内置浏览器） */
@@ -30,22 +30,22 @@
 
     /* ── 标题区 */
     .page-header {
-      padding: 48px 32px 20px;
+      padding: 64px 32px 30px;
       text-align: center;
-      border-bottom: 1px solid #eee;
     }
     .page-title {
-      font-size: 22px;
-      font-weight: 700;
-      color: #111;
-      letter-spacing: 0.5px;
-      margin-bottom: 14px;
+      font-size: 26px;
+      font-weight: bold;
+      color: #000;
+      letter-spacing: 2px;
+      margin-bottom: 24px;
     }
     .page-disclaimer {
-      font-size: 13px;
-      color: #888;
+      font-size: 16px;
+      color: #333;
       line-height: 1.8;
       text-align: center;
+      letter-spacing: 1px;
     }
 
     /* ── 信息主体 */
@@ -57,20 +57,17 @@
       display: flex;
       align-items: flex-start;
       gap: 24px;
-      padding: 18px 0;
-      border-bottom: 1px solid #f0f0f0;
+      padding: 12px 0;
     }
-    .info-row:last-child { border-bottom: none; }
     .info-label {
-      font-size: 14px;
-      color: #888;
-      width: 64px;
+      font-size: 16px;
+      color: #666;
+      width: 80px;
       flex-shrink: 0;
       line-height: 1.6;
-      padding-top: 1px;
     }
     .info-value {
-      font-size: 15px;
+      font-size: 16px;
       color: #111;
       line-height: 1.6;
       flex: 1;
@@ -79,14 +76,14 @@
 
     /* ── 底部免责声明 */
     .page-footer {
-      padding: 24px 32px 40px;
-      border-top: 1px solid #f0f0f0;
+      padding: 40px 32px 40px;
       text-align: center;
     }
     .footer-disclaimer {
-      font-size: 12px;
-      color: #bbb;
+      font-size: 14px;
+      color: #999;
       line-height: 1.8;
+      letter-spacing: 0.5px;
     }
 
     /* ── 错误状态 */
