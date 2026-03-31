@@ -13,9 +13,10 @@
 
     html, body {
       height: 100%;
-      font-family: 'STKaiti', 'KaiTi', '楷体', 'Noto Sans SC', serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', 'Noto Sans SC', 'Microsoft YaHei', sans-serif;
       background: #fff;
       color: #000;
+      -webkit-font-smoothing: antialiased;
     }
 
     /* ── 顶部状态栏占位（仿微信内置浏览器） */
@@ -34,18 +35,17 @@
       text-align: center;
     }
     .page-title {
-      font-size: 26px;
-      font-weight: bold;
-      color: #000;
-      letter-spacing: 2px;
+      font-size: 22px;
+      font-weight: 600;
+      color: #111;
+      letter-spacing: 0.5px;
       margin-bottom: 24px;
     }
     .page-disclaimer {
-      font-size: 16px;
-      color: #333;
-      line-height: 1.8;
+      font-size: 15px;
+      color: #222;
+      line-height: 1.6;
       text-align: center;
-      letter-spacing: 1px;
     }
 
     /* ── 信息主体 */
@@ -60,15 +60,15 @@
       padding: 12px 0;
     }
     .info-label {
-      font-size: 16px;
-      color: #666;
-      width: 80px;
+      font-size: 14px;
+      color: #777;
+      width: 72px;
       flex-shrink: 0;
       line-height: 1.6;
     }
     .info-value {
-      font-size: 16px;
-      color: #111;
+      font-size: 14px;
+      color: #222;
       line-height: 1.6;
       flex: 1;
       word-break: break-all;
