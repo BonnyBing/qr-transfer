@@ -38,6 +38,7 @@
       <nav class="nav-pills">
         <button class="nav-pill active" onclick="switchTab('file')" id="tabFile">文件转码</button>
         <button class="nav-pill" onclick="switchTab('text')" id="tabText">文字转码</button>
+        <button class="nav-pill" onclick="switchTab('invoice')" id="tabInvoice">🧾 发票转码</button>
       </nav>
       <div class="header-badge">
         <span id="tokenStatusDot" style="display:none;width:7px;height:7px;background:#38ef7d;border-radius:50%;display:none;margin-right:6px;vertical-align:middle"></span>
@@ -172,6 +173,50 @@
           <button class="generate-btn" id="generateTextBtn" onclick="handleTextGenerate()">
             <span class="btn-icon">⚡</span>
             <span class="btn-text">生成二维码</span>
+          </button>
+        </div>
+
+        <!-- INVOICE TAB -->
+        <div class="tab-content" id="panelInvoice">
+          <div class="invoice-form">
+            <div class="invoice-field">
+              <label class="option-label">发票号码</label>
+              <input class="invoice-input" id="invoiceNum" type="text" placeholder="请输入发票号码" maxlength="30" />
+            </div>
+            <div class="invoice-field">
+              <label class="option-label">合计金额（含税）</label>
+              <input class="invoice-input" id="invoiceAmount" type="text" placeholder="例：33628.80" maxlength="20" />
+            </div>
+            <div class="invoice-field">
+              <label class="option-label">开票日期</label>
+              <input class="invoice-input" id="invoiceDate" type="text" placeholder="例：2025.11.13" maxlength="12" />
+            </div>
+          </div>
+
+          <div class="options-row">
+            <div class="option-group">
+              <label class="option-label">二维码颜色</label>
+              <div class="color-row" id="invoiceColorRow">
+                <div class="color-swatch active" data-color="#1a1a1a" style="background:#1a1a1a" onclick="selectColorInvoice(this)"></div>
+                <div class="color-swatch" data-color="#6C63FF" style="background:#6C63FF" onclick="selectColorInvoice(this)"></div>
+                <div class="color-swatch" data-color="#8B0000" style="background:#8B0000" onclick="selectColorInvoice(this)"></div>
+                <div class="color-swatch" data-color="#00695C" style="background:#00695C" onclick="selectColorInvoice(this)"></div>
+                <input type="color" id="customColorInvoice" class="custom-color-input" value="#1a1a1a" oninput="customColorInvoiceChanged(this)" title="自定义颜色" />
+              </div>
+            </div>
+            <div class="option-group">
+              <label class="option-label">尺寸</label>
+              <div class="size-row" id="invoiceSizeRow">
+                <button class="size-btn" data-size="200" onclick="selectSizeInvoice(this)">小</button>
+                <button class="size-btn active" data-size="280" onclick="selectSizeInvoice(this)">中</button>
+                <button class="size-btn" data-size="360" onclick="selectSizeInvoice(this)">大</button>
+              </div>
+            </div>
+          </div>
+
+          <button class="generate-btn" id="generateInvoiceBtn" onclick="handleInvoiceGenerate()">
+            <span class="btn-icon">🧾</span>
+            <span class="btn-text">生成发票二维码</span>
           </button>
         </div>
       </div>

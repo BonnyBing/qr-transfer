@@ -9,8 +9,10 @@ const state = {
   selectedFile: null,
   qrColor: '#6C63FF',
   qrColorText: '#6C63FF',
+  qrColorInvoice: '#1a1a1a',
   qrSize: 280,
   qrSizeText: 280,
+  qrSizeInvoice: 280,
   currentQRUrl: '',
 };
 
@@ -173,6 +175,21 @@ function selectSizeText(el) {
   state.qrSizeText = parseInt(el.dataset.size);
 }
 
+function selectColorInvoice(el) {
+  document.querySelectorAll('#invoiceColorRow .color-swatch').forEach(s => s.classList.remove('active'));
+  el.classList.add('active');
+  state.qrColorInvoice = el.dataset.color;
+}
+function customColorInvoiceChanged(input) {
+  document.querySelectorAll('#invoiceColorRow .color-swatch').forEach(s => s.classList.remove('active'));
+  state.qrColorInvoice = input.value;
+}
+function selectSizeInvoice(el) {
+  document.querySelectorAll('#invoiceSizeRow .size-btn').forEach(s => s.classList.remove('active'));
+  el.classList.add('active');
+  state.qrSizeInvoice = parseInt(el.dataset.size);
+}
+
 // ── Generate ───────────────────────────────────────
 async function handleFileGenerate() {
   if (!state.selectedFile) {
@@ -225,6 +242,59 @@ async function handleTextGenerate() {
   } finally {
     btn.disabled = false;
   }
+}
+
+function handleInvoiceGenerate() {
+  const num    = document.getElementById('invoiceNum').value.trim();
+  const amount = document.getElementById('invoiceAmount').value.trim();
+  const date   = document.getElementById('invoiceDate').value.trim();
+
+  if (!num || !amount || !date) {
+    showToast('\u26a0\ufe0f \u8bf7\u586b\u5199\u5b8c\u6574\u7684\u53d1\u7968\u4fe1\u606f');
+    return;
+  }
+
+  const base = window.location.href.replace(/\/[^/]*$/, '/invoice.html');
+  const params = new URLSearchParams({
+    num:    encodeURIComponent(num),
+    amount: encodeURIComponent(amount),
+    date:   encodeURIComponent(date),
+  });
+  const pageUrl = `${base}#${params.toString()}`;
+
+  state.currentQRUrl = pageUrl;
+  renderQR(pageUrl, state.qrSizeInvoice, state.qrColorInvoice);
+  setTimeout(() => addInvoiceTaxWatermark(), 80);
+
+  document.getElementById('qrTypeLabel').textContent = '\u53d1\u7968\u4fe1\u606f';
+  document.getElementById('qrServiceLabel').textContent = '\u672c\u5730\u7f16\u7801';
+  showQRResult();
+  showToast('\u2705 \u53d1\u7968\u4e8c\u7ef4\u7801\u751f\u6210\u6210\u529f\uff01');
+}
+
+function addInvoiceTaxWatermark() {
+  const box    = document.getElementById('qrBox');
+  const canvas = box.querySelector('canvas');
+  if (!canvas) return;
+  const size = canvas.width;
+  const ctx  = canvas.getContext('2d');
+  const fontSize = Math.round(size * 0.18);
+  ctx.save();
+  const pad = fontSize * 0.3;
+  ctx.fillStyle = 'rgba(255,255,255,0.88)';
+  ctx.beginPath();
+  if (ctx.roundRect) {
+    ctx.roundRect(size/2 - fontSize/2 - pad, size/2 - fontSize/2 - pad, fontSize + pad*2, fontSize + pad*2, 8);
+  } else {
+    ctx.rect(size/2 - fontSize/2 - pad, size/2 - fontSize/2 - pad, fontSize + pad*2, fontSize + pad*2);
+  }
+  ctx.fill();
+  ctx.font = `bold ${fontSize}px "Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif`;
+  ctx.fillStyle = '#C8972E';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('\u7a0e', size / 2, size / 2);
+  ctx.restore();
 }
 
 // ── File Upload ─────────────────────────────────────

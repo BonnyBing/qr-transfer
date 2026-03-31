@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>发票信息</title>
+  <meta name="description" content="发票二维码信息查看" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      font-family: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      background: #f5f5f5;
+      color: #222;
+    }
+
+    /* ── 顶部状态栏占位（仿微信内置浏览器） */
+    .page-wrap {
+      min-height: 100vh;
+      background: #fff;
+      max-width: 480px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── 标题区 */
+    .page-header {
+      padding: 48px 32px 20px;
+      text-align: center;
+      border-bottom: 1px solid #eee;
+    }
+    .page-title {
+      font-size: 22px;
+      font-weight: 700;
+      color: #111;
+      letter-spacing: 0.5px;
+      margin-bottom: 14px;
+    }
+    .page-disclaimer {
+      font-size: 13px;
+      color: #888;
+      line-height: 1.8;
+      text-align: center;
+    }
+
+    /* ── 信息主体 */
+    .info-body {
+      flex: 1;
+      padding: 32px 32px 24px;
+    }
+    .info-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 24px;
+      padding: 18px 0;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .info-row:last-child { border-bottom: none; }
+    .info-label {
+      font-size: 14px;
+      color: #888;
+      width: 64px;
+      flex-shrink: 0;
+      line-height: 1.6;
+      padding-top: 1px;
+    }
+    .info-value {
+      font-size: 15px;
+      color: #111;
+      line-height: 1.6;
+      flex: 1;
+      word-break: break-all;
+    }
+
+    /* ── 底部免责声明 */
+    .page-footer {
+      padding: 24px 32px 40px;
+      border-top: 1px solid #f0f0f0;
+      text-align: center;
+    }
+    .footer-disclaimer {
+      font-size: 12px;
+      color: #bbb;
+      line-height: 1.8;
+    }
+
+    /* ── 错误状态 */
+    .error-wrap {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      padding: 48px 32px;
+      text-align: center;
+    }
+    .error-icon { font-size: 52px; }
+    .error-title { font-size: 18px; font-weight: 700; color: #333; }
+    .error-sub { font-size: 14px; color: #999; line-height: 1.6; }
+
+    /* ── 加载中 */
+    .loading-wrap {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      color: #aaa;
+      font-size: 14px;
+    }
+    .spinner {
+      width: 20px; height: 20px;
+      border: 2px solid #eee;
+      border-top-color: #999;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="page-wrap" id="pageWrap">
+    <!-- 加载中 -->
+    <div class="loading-wrap" id="loadingState">
+      <div class="spinner"></div>
+      <span>读取中...</span>
+    </div>
+  </div>
+
+  <script>
+    function parseHash() {
+      const hash = window.location.hash.slice(1);
+      if (!hash) return null;
+      try {
+        const raw = Object.fromEntries(new URLSearchParams(hash));
+        // 每个值经过了两层 encode，统一 decode 一次
+        const out = {};
+        for (const k of Object.keys(raw)) {
+          try { out[k] = decodeURIComponent(raw[k]); } catch { out[k] = raw[k]; }
+        }
+        return out;
+      } catch { return null; }
+    }
+
+    function esc(str) {
+      return String(str)
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function showError(title, sub) {
+      document.getElementById('pageWrap').innerHTML = `
+        <div class="page-header">
+          <div class="page-title">发票信息</div>
+        </div>
+        <div class="error-wrap">
+          <div class="error-icon">😕</div>
+          <div class="error-title">${esc(title)}</div>
+          <div class="error-sub">${esc(sub)}</div>
+        </div>`;
+    }
+
+    function init() {
+      const params = parseHash();
+
+      if (!params || !params.num || !params.amount || !params.date) {
+        showError('无法读取发票信息', '二维码数据不完整，请重新扫码或重新生成二维码');
+        return;
+      }
+
+      const { num, amount, date } = params;
+
+      document.getElementById('pageWrap').innerHTML = `
+        <div class="page-header">
+          <div class="page-title">发票信息</div>
+          <div class="page-disclaimer">
+            以下信息仅为发票二维码所含信息，并不<br>代表查验发票真伪的结果。
+          </div>
+        </div>
+
+        <div class="info-body">
+          <div class="info-row">
+            <span class="info-label">发票号码</span>
+            <span class="info-value">${esc(num)}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">合计金额</span>
+            <span class="info-value">¥${esc(amount)}（含税）</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">开票日期</span>
+            <span class="info-value">${esc(date)}</span>
+          </div>
+        </div>
+
+        <div class="page-footer">
+          <div class="footer-disclaimer">
+            如需查验发票真伪，请通过税务机关提供的官方渠<br>道进行查验。
+          </div>
+        </div>`;
+    }
+
+    init();
+  </script>
+</body>
+</html>
