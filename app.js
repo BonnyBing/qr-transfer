@@ -273,13 +273,17 @@ function handleInvoiceGenerate() {
 }
 
 function addInvoiceTaxWatermark(retries) {
-  retries = (retries === undefined) ? 10 : retries;
+  retries = (retries === undefined) ? 15 : retries;
   const box    = document.getElementById('qrBox');
   const canvas = box ? box.querySelector('canvas') : null;
-  if (!canvas) {
+  const img    = box ? box.querySelector('img') : null;
+  
+  // 必须等 canvas 生成且 qrcode.js 将初始 img.src 赋值完成后再加水印，避免被它覆盖
+  if (!canvas || !img || !img.src) {
     if (retries > 0) setTimeout(() => addInvoiceTaxWatermark(retries - 1), 100);
     return;
   }
+
   const size = canvas.width;
   const ctx  = canvas.getContext('2d');
   const fontSize = Math.round(size * 0.18);
@@ -299,6 +303,10 @@ function addInvoiceTaxWatermark(retries) {
   ctx.textBaseline = 'middle';
   ctx.fillText('\u7a0e', size / 2, size / 2);
   ctx.restore();
+
+  // ！关键修复：二维码生成库实际在大多数机型上显示的是 img 标签
+  // 必须把加上了水印的 canvas 同步回 img 的 src 中
+  img.src = canvas.toDataURL('image/png');
 }
 
 // ── File Upload ─────────────────────────────────────
