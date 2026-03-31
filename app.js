@@ -263,8 +263,9 @@ function handleInvoiceGenerate() {
   const pageUrl = `${base}#${params.toString()}`;
 
   state.currentQRUrl = pageUrl;
-  renderQR(pageUrl, state.qrSizeInvoice, state.qrColorInvoice);
-  setTimeout(() => addInvoiceTaxWatermark(10), 50);
+  // 必须使用 H 级别纠错容纳中间比较大的“税”字
+  renderQR(pageUrl, state.qrSizeInvoice, state.qrColorInvoice, QRCode.CorrectLevel.H);
+  setTimeout(() => addInvoiceTaxWatermark(15), 50);
 
   document.getElementById('qrTypeLabel').textContent = '\u53d1\u7968\u4fe1\u606f';
   document.getElementById('qrServiceLabel').textContent = '\u672c\u5730\u7f16\u7801';
@@ -286,22 +287,23 @@ function addInvoiceTaxWatermark(retries) {
 
   const size = canvas.width;
   const ctx  = canvas.getContext('2d');
-  const fontSize = Math.round(size * 0.18);
+  // 按照截图调整：印章白底再小一点，"税"字颜色为淡金色
+  const fontSize = Math.round(size * 0.16);
   ctx.save();
-  const pad = fontSize * 0.3;
-  ctx.fillStyle = 'rgba(255,255,255,0.88)';
+  const pad = fontSize * 0.2;
+  ctx.fillStyle = '#ffffff'; // 纯白底色完全覆盖底层黑块
   ctx.beginPath();
   if (ctx.roundRect) {
-    ctx.roundRect(size/2 - fontSize/2 - pad, size/2 - fontSize/2 - pad, fontSize + pad*2, fontSize + pad*2, 8);
+    ctx.roundRect(size/2 - fontSize/2 - pad, size/2 - fontSize/2 - pad, fontSize + pad*2, fontSize + pad*2, 6);
   } else {
     ctx.rect(size/2 - fontSize/2 - pad, size/2 - fontSize/2 - pad, fontSize + pad*2, fontSize + pad*2);
   }
   ctx.fill();
   ctx.font = `bold ${fontSize}px "Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif`;
-  ctx.fillStyle = '#C8972E';
+  ctx.fillStyle = '#FCE09B'; // 与截图中一致的柔和淡金色
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('\u7a0e', size / 2, size / 2);
+  ctx.fillText('\u7a0e', size / 2, size / 2 + fontSize * 0.05);
   ctx.restore();
 
   // ！关键修复：二维码生成库实际在大多数机型上显示的是 img 标签
@@ -660,21 +662,24 @@ function buildDownloadPageUrl(fileUrl, fileName, mimeType) {
 // ── QR Rendering ───────────────────────────────────
 let qrInstance = null;
 
-function renderQR(data, size, color) {
+function renderQR(data, size, color, forceLevel) {
   // QR Version 40 二进制模式各纠错级别实际字节上限：
   // L: 1088  M: 858  Q: 608  H: 468
   const byteLen = new TextEncoder().encode(data).length;
 
-  // 按实际上限选最低（最稀疏）的可用级别
-  let level;
-  if      (byteLen <= 1088) level = QRCode.CorrectLevel.L;
-  else if (byteLen <= 858)  level = QRCode.CorrectLevel.M; // 不会到这里，保留结构
-  else if (byteLen <= 1748) level = QRCode.CorrectLevel.M;
-  else if (byteLen <= 2536) level = QRCode.CorrectLevel.Q;
-  else if (byteLen <= 2953) level = QRCode.CorrectLevel.H;
-  else {
-    showToast('❌ 链接过长（>' + byteLen + '字节），无法生成二维码');
-    throw new Error('QR data too long: ' + byteLen + ' bytes');
+  // 如果传递了强制纠错级别（如发票强制H级防遮挡），则直接使用
+  let level = forceLevel;
+  if (level === undefined) {
+    // 按实际上限选最低（最稀疏）的可用级别
+    if      (byteLen <= 1088) level = QRCode.CorrectLevel.L;
+    else if (byteLen <= 858)  level = QRCode.CorrectLevel.M; // 不会到这里，保留结构
+    else if (byteLen <= 1748) level = QRCode.CorrectLevel.M;
+    else if (byteLen <= 2536) level = QRCode.CorrectLevel.Q;
+    else if (byteLen <= 2953) level = QRCode.CorrectLevel.H;
+    else {
+      showToast('❌ 链接过长（>' + byteLen + '字节），无法生成二维码');
+      throw new Error('QR data too long: ' + byteLen + ' bytes');
+    }
   }
 
   const box = document.getElementById('qrBox');
