@@ -7,12 +7,15 @@
 const state = {
   activeTab: 'file',
   selectedFile: null,
+  selectedSoftwareFile: null,
   qrColor: '#6C63FF',
   qrColorText: '#6C63FF',
   qrColorInvoice: '#1a1a1a',
+  qrColorSoftware: '#11998e',
   qrSize: 280,
   qrSizeText: 280,
   qrSizeInvoice: 280,
+  qrSizeSoftware: 280,
   currentQRUrl: '',
 };
 
@@ -20,6 +23,7 @@ const state = {
 document.addEventListener('DOMContentLoaded', () => {
   initParticles();
   initUploadZone();
+  initSoftwareUploadZone();
   initTextCounter();
   loadGhToken();
 });
@@ -134,6 +138,146 @@ function clearFile() {
   document.getElementById('filePreview').classList.add('hidden');
   document.getElementById('imgPreviewWrap').classList.add('hidden');
   hideQRResult();
+}
+
+// ── Software Installer Upload ─────────────────────
+const INSTALLER_EXTS = ['.apk', '.aab', '.ipa', '.exe', '.msi', '.dmg', '.pkg', '.deb', '.rpm', '.appx', '.msix'];
+
+function isInstallerFile(file) {
+  const n = file.name.toLowerCase();
+  return INSTALLER_EXTS.some(ext => n.endsWith(ext));
+}
+
+function getInstallerIcon(file) {
+  const n = file.name.toLowerCase();
+  if (n.endsWith('.apk') || n.endsWith('.aab')) return '🤖';
+  if (n.endsWith('.ipa')) return '🍎';
+  if (n.endsWith('.exe') || n.endsWith('.msi') || n.endsWith('.appx') || n.endsWith('.msix')) return '🪟';
+  if (n.endsWith('.dmg') || n.endsWith('.pkg')) return '💻';
+  if (n.endsWith('.deb') || n.endsWith('.rpm')) return '🐧';
+  return '📲';
+}
+
+function getInstallerTypeName(file) {
+  const n = file.name.toLowerCase();
+  if (n.endsWith('.apk')) return 'Android 安装包 (APK)';
+  if (n.endsWith('.aab')) return 'Android App Bundle (AAB)';
+  if (n.endsWith('.ipa')) return 'iOS 安装包 (IPA)';
+  if (n.endsWith('.exe')) return 'Windows 程序 (EXE)';
+  if (n.endsWith('.msi')) return 'Windows 安装包 (MSI)';
+  if (n.endsWith('.dmg')) return 'macOS 磁盘映像 (DMG)';
+  if (n.endsWith('.pkg')) return 'macOS 安装包 (PKG)';
+  if (n.endsWith('.deb')) return 'Debian 安装包 (DEB)';
+  if (n.endsWith('.rpm')) return 'RPM 安装包';
+  if (n.endsWith('.appx') || n.endsWith('.msix')) return 'Windows 应用包';
+  return '软件安装包';
+}
+
+function getInstallerPlatform(file) {
+  const n = file.name.toLowerCase();
+  if (n.endsWith('.apk') || n.endsWith('.aab')) return 'Android';
+  if (n.endsWith('.ipa')) return 'iOS';
+  if (n.endsWith('.exe') || n.endsWith('.msi') || n.endsWith('.appx') || n.endsWith('.msix')) return 'Windows';
+  if (n.endsWith('.dmg') || n.endsWith('.pkg')) return 'macOS';
+  if (n.endsWith('.deb') || n.endsWith('.rpm')) return 'Linux';
+  return '通用';
+}
+
+function initSoftwareUploadZone() {
+  const zone = document.getElementById('softwareUploadZone');
+  const input = document.getElementById('softwareInput');
+  if (!zone || !input) return;
+
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('drag-over');
+    if (e.dataTransfer.files.length) selectSoftwareFile(e.dataTransfer.files[0]);
+  });
+  input.addEventListener('change', () => { if (input.files[0]) selectSoftwareFile(input.files[0]); });
+}
+
+function selectSoftwareFile(file) {
+  if (!isInstallerFile(file)) {
+    showToast('⚠️ 请选择有效的安装包文件（APK、IPA、EXE、DMG 等）');
+    return;
+  }
+  if (file.size > 200 * 1024 * 1024) {
+    showToast('⚠️ 安装包超过 200MB，上传可能失败，建议使用 GitHub 上传');
+  }
+  state.selectedSoftwareFile = file;
+  document.getElementById('softwareUploadZone').classList.add('hidden');
+  document.getElementById('softwarePreview').classList.remove('hidden');
+  document.getElementById('softwareTypeIcon').textContent = getInstallerIcon(file);
+  document.getElementById('softwareName').textContent = file.name;
+  document.getElementById('softwareSize').textContent = formatBytes(file.size);
+  document.getElementById('softwarePlatform').textContent = getInstallerPlatform(file) + ' · ' + getInstallerTypeName(file);
+}
+
+function clearSoftwareFile() {
+  state.selectedSoftwareFile = null;
+  document.getElementById('softwareInput').value = '';
+  document.getElementById('softwareUploadZone').classList.remove('hidden');
+  document.getElementById('softwarePreview').classList.add('hidden');
+  hideQRResult();
+}
+
+function selectColorSoftware(el) {
+  document.querySelectorAll('#softwareColorRow .color-swatch').forEach(s => s.classList.remove('active'));
+  el.classList.add('active');
+  state.qrColorSoftware = el.dataset.color;
+}
+function customColorSoftwareChanged(input) {
+  document.querySelectorAll('#softwareColorRow .color-swatch').forEach(s => s.classList.remove('active'));
+  state.qrColorSoftware = input.value;
+}
+function selectSizeSoftware(el) {
+  document.querySelectorAll('#softwareSizeRow .size-btn').forEach(s => s.classList.remove('active'));
+  el.classList.add('active');
+  state.qrSizeSoftware = parseInt(el.dataset.size);
+}
+
+async function handleSoftwareGenerate() {
+  if (!state.selectedSoftwareFile) {
+    showToast('⚠️ 请先选择要分发的安装包');
+    return;
+  }
+  const btn = document.getElementById('generateSoftwareBtn');
+  btn.disabled = true;
+
+  try {
+    showProgress('正在上传安装包...', '上传完成后将生成扫码下载二维码');
+    const { url: fileUrl, service } = await uploadFile(state.selectedSoftwareFile);
+    hideProgress();
+
+    const downloadPageUrl = buildDownloadPageUrl(
+      fileUrl,
+      state.selectedSoftwareFile.name,
+      state.selectedSoftwareFile.type,
+      'installer'
+    );
+    state.currentQRUrl = downloadPageUrl;
+    renderQR(downloadPageUrl, state.qrSizeSoftware, state.qrColorSoftware);
+    document.getElementById('qrTypeLabel').textContent = getInstallerTypeName(state.selectedSoftwareFile);
+    document.getElementById('qrServiceLabel').textContent = service;
+    const tipDesc = document.getElementById('scanTipDesc');
+    if (tipDesc) {
+      tipDesc.textContent = '用户扫码后将进入安装包下载页，可直接下载 ' + getInstallerPlatform(state.selectedSoftwareFile) + ' 安装包';
+    }
+    showQRResult();
+    showToast('✅ 安装包二维码生成成功！');
+  } catch (err) {
+    hideProgress();
+    console.error(err);
+    if (err.message === 'NEED_TOKEN') {
+      showTokenModal();
+    } else {
+      showToast('❌ ' + (err.message || '上传失败，请重试'));
+    }
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 // ── Text Counter ───────────────────────────────────
@@ -613,7 +757,32 @@ async function saveTokenAndUpload() {
   closeTokenModal();
 
   // Retry upload with the new token
-  if (state.selectedFile) {
+  if (state.selectedSoftwareFile) {
+    const btn = document.getElementById('generateSoftwareBtn');
+    btn.disabled = true;
+    try {
+      showProgress('正在通过 GitHub 上传...', '使用您的 GitHub 仓库存储安装包');
+      const { url: fileUrl, service } = await uploadFile(state.selectedSoftwareFile);
+      hideProgress();
+      const downloadPageUrl = buildDownloadPageUrl(
+        fileUrl,
+        state.selectedSoftwareFile.name,
+        state.selectedSoftwareFile.type,
+        'installer'
+      );
+      state.currentQRUrl = downloadPageUrl;
+      renderQR(downloadPageUrl, state.qrSizeSoftware, state.qrColorSoftware);
+      document.getElementById('qrTypeLabel').textContent = getInstallerTypeName(state.selectedSoftwareFile);
+      document.getElementById('qrServiceLabel').textContent = service;
+      showQRResult();
+      showToast('✅ 安装包二维码生成成功！');
+    } catch (err) {
+      hideProgress();
+      showToast('❌ ' + (err.message || '上传失败'));
+    } finally {
+      btn.disabled = false;
+    }
+  } else if (state.selectedFile) {
     const btn = document.getElementById('generateFileBtn');
     btn.disabled = true;
     try {
@@ -649,13 +818,14 @@ function clearGhToken() {
  * Build a self-hosted download page URL via hash params.
  * The QR code links to download.html which handles WeChat guidance + auto-download.
  */
-function buildDownloadPageUrl(fileUrl, fileName, mimeType) {
+function buildDownloadPageUrl(fileUrl, fileName, mimeType, kind) {
   const base = window.location.href.replace(/\/[^/]*$/, '/download.html');
   const params = new URLSearchParams({
     url: encodeURIComponent(fileUrl),
     name: encodeURIComponent(fileName || ''),
     type: encodeURIComponent(mimeType || ''),
   });
+  if (kind) params.set('kind', kind);
   return `${base}#${params.toString()}`;
 }
 
@@ -754,8 +924,13 @@ async function copyQRImage() {
 
 function resetAll() {
   clearFile();
+  clearSoftwareFile();
   document.getElementById('textInput').value = '';
   document.getElementById('charCount').textContent = '0';
+  const tipDesc = document.getElementById('scanTipDesc');
+  if (tipDesc) {
+    tipDesc.textContent = '打开手机相机或微信扫一扫，对准二维码即可跳转到文件下载页面';
+  }
   hideQRResult();
   showToast('🔄 已重置，可重新生成');
 }

@@ -37,6 +37,7 @@
       </div>
       <nav class="nav-pills">
         <button class="nav-pill active" onclick="switchTab('file')" id="tabFile">文件转码</button>
+        <button class="nav-pill" onclick="switchTab('software')" id="tabSoftware">📲 软件安装包</button>
         <button class="nav-pill" onclick="switchTab('text')" id="tabText">文字转码</button>
         <button class="nav-pill" onclick="switchTab('invoice')" id="tabInvoice">🧾 发票转码</button>
       </nav>
@@ -65,6 +66,7 @@
         <span class="type-chip"><span class="type-icon">🎬</span>视频</span>
         <span class="type-chip"><span class="type-icon">🎵</span>音频</span>
         <span class="type-chip"><span class="type-icon">💬</span>文字</span>
+        <span class="type-chip"><span class="type-icon">📲</span>安装包</span>
       </div>
     </section>
 
@@ -137,6 +139,78 @@
           <button class="generate-btn" id="generateFileBtn" onclick="handleFileGenerate()">
             <span class="btn-icon">⚡</span>
             <span class="btn-text">生成二维码</span>
+          </button>
+        </div>
+
+        <!-- SOFTWARE TAB -->
+        <div class="tab-content" id="panelSoftware">
+          <div class="software-intro">
+            <p>上传 Android / iOS / Windows / macOS 安装包，生成二维码，用户扫码即可下载安装</p>
+          </div>
+          <div class="upload-zone software-upload-zone" id="softwareUploadZone">
+            <input type="file" id="softwareInput" class="file-input"
+              accept=".apk,.aab,.ipa,.exe,.msi,.dmg,.pkg,.deb,.rpm,.appx,.msix" />
+            <div class="upload-icon-wrap">
+              <div class="upload-icon-ring"></div>
+              <div class="upload-icon">
+                <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect x="14" y="8" width="36" height="48" rx="6" stroke="currentColor" stroke-width="2.5"/>
+                  <circle cx="32" cy="48" r="3" fill="currentColor"/>
+                  <path d="M26 20h12M26 28h12M26 36h8" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+                </svg>
+              </div>
+            </div>
+            <p class="upload-title">拖拽安装包到这里</p>
+            <p class="upload-sub">或者 <span class="upload-link" onclick="document.getElementById('softwareInput').click()">点击选择安装包</span></p>
+            <p class="upload-limit">支持 APK、AAB、IPA、EXE、MSI、DMG、PKG 等格式 · 建议单文件 &lt; 200MB</p>
+            <div class="platform-chips">
+              <span class="platform-chip">🤖 Android</span>
+              <span class="platform-chip">🍎 iOS</span>
+              <span class="platform-chip">🪟 Windows</span>
+              <span class="platform-chip">💻 macOS</span>
+            </div>
+          </div>
+
+          <div class="file-preview hidden" id="softwarePreview">
+            <div class="file-preview-inner">
+              <div class="file-icon-wrap software-icon-wrap" id="softwareIconWrap">
+                <span class="file-type-icon" id="softwareTypeIcon">📲</span>
+              </div>
+              <div class="file-info">
+                <p class="file-name" id="softwareName">—</p>
+                <p class="file-size" id="softwareSize">—</p>
+                <p class="software-platform" id="softwarePlatform">—</p>
+              </div>
+              <button class="remove-btn" onclick="clearSoftwareFile()">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="options-row" id="softwareOptions">
+            <div class="option-group">
+              <label class="option-label">二维码颜色</label>
+              <div class="color-row" id="softwareColorRow">
+                <div class="color-swatch active" data-color="#11998e" style="background:linear-gradient(135deg,#11998e,#38ef7d)" onclick="selectColorSoftware(this)"></div>
+                <div class="color-swatch" data-color="#6C63FF" style="background:#6C63FF" onclick="selectColorSoftware(this)"></div>
+                <div class="color-swatch" data-color="#00D2FF" style="background:linear-gradient(135deg,#00D2FF,#3A7BD5)" onclick="selectColorSoftware(this)"></div>
+                <div class="color-swatch" data-color="#1a1a2e" style="background:#1a1a2e" onclick="selectColorSoftware(this)"></div>
+                <input type="color" id="customColorSoftware" class="custom-color-input" value="#11998e" oninput="customColorSoftwareChanged(this)" title="自定义颜色" />
+              </div>
+            </div>
+            <div class="option-group">
+              <label class="option-label">尺寸</label>
+              <div class="size-row" id="softwareSizeRow">
+                <button class="size-btn" data-size="200" onclick="selectSizeSoftware(this)">小</button>
+                <button class="size-btn active" data-size="280" onclick="selectSizeSoftware(this)">中</button>
+                <button class="size-btn" data-size="360" onclick="selectSizeSoftware(this)">大</button>
+              </div>
+            </div>
+          </div>
+
+          <button class="generate-btn software-generate-btn" id="generateSoftwareBtn" onclick="handleSoftwareGenerate()">
+            <span class="btn-icon">📲</span>
+            <span class="btn-text">生成安装包二维码</span>
           </button>
         </div>
 
@@ -262,7 +336,7 @@
           <div class="scan-tip-icon">📱</div>
           <div>
             <p class="scan-tip-title">如何使用</p>
-            <p class="scan-tip-desc">打开手机相机或微信扫一扫，对准二维码即可跳转到文件下载页面</p>
+            <p class="scan-tip-desc" id="scanTipDesc">打开手机相机或微信扫一扫，对准二维码即可跳转到文件下载页面</p>
           </div>
         </div>
       </div>

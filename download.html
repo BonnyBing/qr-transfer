@@ -343,6 +343,53 @@
     .text-content-wrap::-webkit-scrollbar-track { background: transparent; }
     .text-content-wrap::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 
+    /* Installer state */
+    .installer-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(56,239,125,0.12);
+      border: 1px solid rgba(56,239,125,0.25);
+      border-radius: 50px;
+      padding: 6px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #38ef7d;
+      margin-bottom: 16px;
+    }
+    .install-tips {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 14px;
+      padding: 16px 18px;
+      margin-top: 20px;
+      text-align: left;
+    }
+    .install-tips-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 10px;
+    }
+    .install-tips-list {
+      list-style: none;
+      font-size: 12px;
+      color: var(--sub);
+      line-height: 1.8;
+    }
+    .install-tips-list li::before {
+      content: '•';
+      color: var(--primary-2);
+      margin-right: 8px;
+    }
+    .download-btn.installer-btn {
+      background: linear-gradient(135deg, #11998e, #38ef7d);
+      box-shadow: 0 8px 32px rgba(56,239,125,0.35);
+    }
+    .download-btn.installer-btn:hover {
+      box-shadow: 0 16px 48px rgba(56,239,125,0.45);
+    }
+
     @media (max-width: 500px) {
       .card { padding: 32px 22px; }
       .page-title { font-size: 22px; }
@@ -361,6 +408,47 @@
     <div id="loadingState" class="loading-wrap">
       <div class="spinner"></div>
       <p style="color:var(--sub);font-size:14px;">正在读取文件信息...</p>
+    </div>
+
+    <!-- Installer download (hidden until loaded) -->
+    <div id="installerState" style="display:none;">
+      <div class="installer-badge" id="installerBadge">📲 软件安装包</div>
+      <div class="file-icon-wrap" id="installerIconWrap">📲</div>
+      <h1 class="page-title">扫码 <span>下载安装</span></h1>
+      <p class="page-sub" id="installerSub">点击下方按钮下载安装包到设备</p>
+      <div class="file-info-box">
+        <div class="file-info-row">
+          <span class="info-label">文件名</span>
+          <span class="info-value" id="installerName">—</span>
+        </div>
+        <div class="file-info-row">
+          <span class="info-label">平台</span>
+          <span class="info-value" id="installerPlatform">—</span>
+        </div>
+        <div class="file-info-row">
+          <span class="info-label">类型</span>
+          <span class="info-value" id="installerType">—</span>
+        </div>
+      </div>
+      <a id="installerDownloadBtn" class="download-btn installer-btn" href="#" download>
+        <span class="btn-icon">📥</span>
+        <span id="installerBtnText">下载安装包</span>
+      </a>
+      <div class="direct-link-wrap">
+        <p class="direct-link-label">或复制链接到浏览器打开</p>
+        <div class="direct-link">
+          <span class="direct-link-url" id="installerDirectLink">—</span>
+          <button class="copy-btn" onclick="copyInstallerLink()">复制</button>
+        </div>
+      </div>
+      <div class="install-tips" id="installTips">
+        <p class="install-tips-title">安装说明</p>
+        <ul class="install-tips-list" id="installTipsList"></ul>
+      </div>
+      <p class="notice">
+        <span class="notice-icon">🔒</span>
+        请确认安装包来源可信后再安装
+      </p>
     </div>
 
     <!-- File content (hidden until loaded) -->
@@ -464,6 +552,61 @@
       return url.startsWith('http://') || url.startsWith('https://');
     }
 
+    function getInstallerInfo(name) {
+      const n = (name || '').toLowerCase();
+      if (n.endsWith('.apk')) return { icon: '🤖', platform: 'Android', type: 'APK 安装包', tips: ['下载完成后点击 APK 文件开始安装', '如提示「未知来源」，请在设置中允许安装', '建议使用系统自带文件管理器打开'] };
+      if (n.endsWith('.aab')) return { icon: '🤖', platform: 'Android', type: 'AAB 应用包', tips: ['AAB 需通过应用商店或专用工具安装', '普通用户请使用 APK 格式分发'] };
+      if (n.endsWith('.ipa')) return { icon: '🍎', platform: 'iOS', type: 'IPA 安装包', tips: ['iOS 需通过 TestFlight 或企业证书安装', '无法直接在 Safari 中安装，请使用专用工具'] };
+      if (n.endsWith('.exe')) return { icon: '🪟', platform: 'Windows', type: 'EXE 程序', tips: ['下载后双击运行安装程序', '如 Windows 提示安全警告，点击「更多信息」→「仍要运行」'] };
+      if (n.endsWith('.msi')) return { icon: '🪟', platform: 'Windows', type: 'MSI 安装包', tips: ['下载后双击 MSI 文件开始安装', '需管理员权限时请点击「是」'] };
+      if (n.endsWith('.dmg')) return { icon: '💻', platform: 'macOS', type: 'DMG 磁盘映像', tips: ['下载后打开 DMG，将应用拖入「应用程序」文件夹', '首次打开可能需在「系统设置 → 隐私与安全性」中允许'] };
+      if (n.endsWith('.pkg')) return { icon: '💻', platform: 'macOS', type: 'PKG 安装包', tips: ['下载后双击 PKG 按向导完成安装', '安装过程中可能需要输入 Mac 密码'] };
+      if (n.endsWith('.deb')) return { icon: '🐧', platform: 'Linux', type: 'DEB 安装包', tips: ['可使用 dpkg -i 或软件中心安装', '安装前请确认系统架构匹配'] };
+      if (n.endsWith('.rpm')) return { icon: '🐧', platform: 'Linux', type: 'RPM 安装包', tips: ['可使用 rpm 或 yum/dnf 安装', '安装前请确认系统架构匹配'] };
+      if (n.endsWith('.appx') || n.endsWith('.msix')) return { icon: '🪟', platform: 'Windows', type: 'Windows 应用包', tips: ['下载后双击安装', '部分版本需开启开发者模式'] };
+      return { icon: '📲', platform: '通用', type: '软件安装包', tips: ['下载完成后按系统提示完成安装', '请确认文件来源可信'] };
+    }
+
+    function showInstallerState(params) {
+      const { url, name } = params;
+      const fileName = decodeURIComponent(name || '安装包');
+      const fileUrl = decodeURIComponent(url);
+      const info = getInstallerInfo(fileName);
+
+      document.getElementById('installerBadge').textContent = info.platform + ' · ' + info.type;
+      document.getElementById('installerIconWrap').textContent = info.icon;
+      document.getElementById('installerName').textContent = fileName;
+      document.getElementById('installerPlatform').textContent = info.platform;
+      document.getElementById('installerType').textContent = info.type;
+      document.getElementById('installerDirectLink').textContent = fileUrl;
+
+      const downloadBtn = document.getElementById('installerDownloadBtn');
+      downloadBtn.href = fileUrl;
+      downloadBtn.setAttribute('download', fileName);
+
+      const tipsList = document.getElementById('installTipsList');
+      tipsList.innerHTML = info.tips.map(t => `<li>${t}</li>`).join('');
+
+      document.getElementById('installerState').style.display = 'block';
+
+      if (/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)) {
+        document.getElementById('installerSub').textContent = '正在准备下载，如未自动开始请点击下方按钮';
+        setTimeout(() => { downloadBtn.click(); }, 800);
+      }
+    }
+
+    function copyInstallerLink() {
+      const text = document.getElementById('installerDirectLink').textContent;
+      navigator.clipboard.writeText(text).then(() => {
+        const btn = document.querySelector('#installerState .copy-btn');
+        const orig = btn.textContent;
+        btn.textContent = '已复制!';
+        btn.style.background = 'rgba(56,239,125,0.2)';
+        btn.style.color = '#38ef7d';
+        setTimeout(() => { btn.textContent = orig; btn.style = ''; }, 2000);
+      }).catch(() => alert('请手动复制：' + text));
+    }
+
     // ── Init ──────────────────────────────────────
     function init() {
       const params = parseHash();
@@ -476,7 +619,12 @@
         return;
       }
 
-      const { url, name, type } = params;
+      const { url, name, type, kind } = params;
+
+      if (kind === 'installer' && url && isFileUrl(url)) {
+        showInstallerState(params);
+        return;
+      }
 
       if (url && isFileUrl(url)) {
         // File download
