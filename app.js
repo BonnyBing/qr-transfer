@@ -456,6 +456,38 @@ function addInvoiceTaxWatermark(retries) {
 }
 
 // ── File Upload ─────────────────────────────────────
+const GITHUB_CONTENTS_MAX = 20 * 1024 * 1024; // Contents API 实际上限约 25MB
+
+function isGitHubSizeError(msg) {
+  const m = (msg || '').toLowerCase();
+  return m.includes('too large') || m.includes('file size') || m.includes('exceeds');
+}
+
+function isGitHubNetworkError(e) {
+  return e instanceof TypeError
+    || (e.message || '').includes('fetch')
+    || (e.message || '').includes('network')
+    || (e.message || '').includes('超时');
+}
+
+function makeSafeUploadName(file) {
+  const now = new Date();
+  const timeSlot = now.getHours().toString().padStart(2, '0')
+    + now.getMinutes().toString().padStart(2, '0')
+    + now.getSeconds().toString().padStart(2, '0');
+  const rawExt = file.name.includes('.')
+    ? file.name.slice(file.name.lastIndexOf('.')).toLowerCase().replace(/[^a-z0-9.]/g, '')
+    : '';
+  return timeSlot + rawExt;
+}
+
+function getGhConfig() {
+  return {
+    user: localStorage.getItem('gh_user') || 'BonnyBing',
+    repo: localStorage.getItem('gh_repo') || 'qr-transfer',
+  };
+}
+
 /**
  * Try multiple upload services in order.
  * If GitHub token is saved, use GitHub API first (most reliable in CN).
@@ -466,18 +498,22 @@ async function uploadFile(file) {
 
   // ① GitHub API — 配置了 Token 则优先使用
   if (token) {
-    setProgress(5, '正在通过 GitHub 上传...');
+    const useRelease = file.size > GITHUB_CONTENTS_MAX;
+    setProgress(5, useRelease ? '正在通过 GitHub Releases 上传大文件...' : '正在通过 GitHub 上传...');
     try {
-      const url = await uploadGitHub(file, token);
-      return { url, service: 'GitHub jsDelivr CDN' };
+      const url = useRelease
+        ? await uploadGitHubRelease(file, token)
+        : await uploadGitHub(file, token);
+      return { url, service: useRelease ? 'GitHub Releases' : 'GitHub Pages' };
     } catch (e) {
-      const isNetworkError = e instanceof TypeError || e.message.includes('fetch') || e.message.includes('network') || e.message.includes('超时');
-      if (isNetworkError) {
-        // 网络层面无法访问 GitHub API → 回退到匿名服务
-        console.warn('GitHub API 网络不可达，尝试匿名服务:', e.message);
-        showToast('⚠️ GitHub API 被拦截，尝试其他上传服务...');
+      if (isGitHubNetworkError(e) || isGitHubSizeError(e.message)) {
+        console.warn('GitHub 上传失败，尝试其他服务:', e.message);
+        showToast(
+          isGitHubSizeError(e.message)
+            ? '⚠️ GitHub 单文件超限，尝试其他上传服务...'
+            : '⚠️ GitHub API 被拦截，尝试其他上传服务...'
+        );
       } else {
-        // Token / 仓库配置错误 → 直接报错，不要回退
         throw new Error(
           `GitHub 上传失败: ${e.message}\n\n` +
           `请在 ⚙️ 中检查：\n` +
@@ -488,16 +524,24 @@ async function uploadFile(file) {
     }
   }
 
-  // ② 未配置 Token — 尝试匿名本地化直链服务
-  const services = [
-    ['catbox.moe',      uploadCatbox],     // 直链 ✓ 永久
-    ['litterbox',       uploadLitterbox],  // 直链 ✓ 72h
-    ['uguu.se',         uploadUguu],       // 直链 ✓ 48h
-    ['file.io',         uploadFileIo],     // 直链 ✓ 14d
-    ['0x0.st',          upload0x0],        // 直链 ✓
-    ['transfer.sh',     uploadTransferSh], // 直链 ✓
-    ['gofile.io',       uploadGofile],     // 页面链接，放最后
-  ];
+  // ② 未配置 Token 或 GitHub 失败 — 尝试匿名直链服务（大文件优先 catbox）
+  const services = file.size > GITHUB_CONTENTS_MAX
+    ? [
+        ['catbox.moe', uploadCatbox],
+        ['litterbox', uploadLitterbox],
+        ['uguu.se', uploadUguu],
+        ['gofile.io', uploadGofile],
+        ['transfer.sh', uploadTransferSh],
+      ]
+    : [
+        ['catbox.moe', uploadCatbox],
+        ['litterbox', uploadLitterbox],
+        ['uguu.se', uploadUguu],
+        ['file.io', uploadFileIo],
+        ['0x0.st', upload0x0],
+        ['transfer.sh', uploadTransferSh],
+        ['gofile.io', uploadGofile],
+      ];
 
   for (const [name, fn] of services) {
     try {
@@ -509,30 +553,18 @@ async function uploadFile(file) {
     }
   }
 
-  // 所有服务均失败 → 提示网络问题
   throw new Error('NEED_TOKEN');
 }
 
 // ── GitHub API Upload (推荐：国内可用) ─────────────────
 async function uploadGitHub(file, token) {
-  // 大文件给出提示但不阻止（GitHub API 实际支持约 50MB）
-  if (file.size > 30 * 1024 * 1024) {
-    showToast(`⚠️ 文件较大（${formatBytes(file.size)}），上传可能较慢，请耐心等待...`);
+  if (file.size > GITHUB_CONTENTS_MAX) {
+    return uploadGitHubRelease(file, token);
   }
   const base64 = await fileToBase64(file);
-  // 文件名只保留 ASCII 扩展名，主名用时分秒，彻底避免中文/乱码/Forbidden
-  const now = new Date();
-  const timeSlot = now.getHours().toString().padStart(2, '0')
-                 + now.getMinutes().toString().padStart(2, '0')
-                 + now.getSeconds().toString().padStart(2, '0');
-  const rawExt = file.name.includes('.')
-    ? file.name.slice(file.name.lastIndexOf('.')).toLowerCase().replace(/[^a-z0-9.]/g, '')
-    : '';
-  const safeName = timeSlot + rawExt;          // e.g. "135027.pdf"
+  const safeName = makeSafeUploadName(file);
   const path = `uploads/${safeName}`;
-
-  const ghUser = localStorage.getItem('gh_user') || 'BonnyBing';
-  const ghRepo = localStorage.getItem('gh_repo') || 'qr-transfer';
+  const { user: ghUser, repo: ghRepo } = getGhConfig();
 
   setProgress(30, '正在上传到 GitHub...');
   const resp = await fetchWithTimeout(
@@ -553,18 +585,82 @@ async function uploadGitHub(file, token) {
   );
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({}));
-    throw new Error(err.message || `GitHub API 错误 ${resp.status}`);
+    const msg = err.message || `GitHub API 错误 ${resp.status}`;
+    if (isGitHubSizeError(msg)) return uploadGitHubRelease(file, token);
+    throw new Error(msg);
   }
-  await resp.json().catch(() => ({})); // consume body
+  await resp.json().catch(() => ({}));
 
   const pagesUrl = `https://${ghUser}.github.io/${ghRepo}/${path}`;
-
-  // GitHub Pages 部署需要约 30s~2min，轮询等待文件真正可访问
   setProgress(95, '等待 GitHub Pages 部署...');
   await waitForPagesDeploy(pagesUrl);
-
   setProgress(100, '文件已就绪！');
   return pagesUrl;
+}
+
+/** GitHub Releases 支持最大约 2GB，适合安装包等大文件 */
+async function uploadGitHubRelease(file, token) {
+  if (file.size > 2 * 1024 * 1024 * 1024) {
+    throw new Error('文件超过 GitHub Releases 2GB 上限');
+  }
+  const { user: ghUser, repo: ghRepo } = getGhConfig();
+  const safeName = makeSafeUploadName(file);
+  const tag = `upload-${Date.now()}`;
+  const timeout = Math.min(600000, Math.max(120000, Math.ceil(file.size / 1024 / 10) * 1000));
+
+  if (file.size > 50 * 1024 * 1024) {
+    showToast(`⚠️ 大文件上传中（${formatBytes(file.size)}），请耐心等待...`);
+  }
+
+  setProgress(20, '正在创建 GitHub Release...');
+  const releaseResp = await fetchWithTimeout(
+    `https://api.github.com/repos/${ghUser}/${ghRepo}/releases`,
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `token ${token}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/vnd.github.v3+json',
+      },
+      body: JSON.stringify({
+        tag_name: tag,
+        name: `Upload ${safeName}`,
+        body: `Auto upload: ${file.name}`,
+      }),
+    },
+    60000
+  );
+  if (!releaseResp.ok) {
+    const err = await releaseResp.json().catch(() => ({}));
+    throw new Error(err.message || `创建 Release 失败 ${releaseResp.status}`);
+  }
+  const release = await releaseResp.json();
+  const uploadUrl = release.upload_url.replace('{?name,label}', `?name=${encodeURIComponent(safeName)}`);
+
+  setProgress(40, `正在上传 ${formatBytes(file.size)}...`);
+  const assetResp = await fetchWithTimeout(
+    uploadUrl,
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `token ${token}`,
+        'Content-Type': file.type || 'application/octet-stream',
+        'Accept': 'application/vnd.github.v3+json',
+      },
+      body: file,
+    },
+    timeout
+  );
+  if (!assetResp.ok) {
+    const err = await assetResp.json().catch(() => ({}));
+    throw new Error(err.message || `上传 Release 资源失败 ${assetResp.status}`);
+  }
+  const asset = await assetResp.json();
+  const downloadUrl = asset.browser_download_url;
+  if (!downloadUrl) throw new Error('未获取到下载链接');
+
+  setProgress(100, '上传完成！');
+  return downloadUrl;
 }
 
 /**
@@ -628,7 +724,8 @@ async function uploadCatbox(file) {
   const form = new FormData();
   form.append('reqtype', 'fileupload');
   form.append('fileToUpload', file);
-  const resp = await fetchWithTimeout('https://catbox.moe/user/api.php', { method: 'POST', body: form }, 90000);
+  const timeout = Math.min(600000, Math.max(90000, Math.ceil(file.size / 1024 / 8) * 1000));
+  const resp = await fetchWithTimeout('https://catbox.moe/user/api.php', { method: 'POST', body: form }, timeout);
   if (!resp.ok) throw new Error(`catbox HTTP ${resp.status}`);
   const url = (await resp.text()).trim();
   if (!url.startsWith('http')) throw new Error('catbox invalid response');
@@ -642,10 +739,11 @@ async function uploadLitterbox(file) {
   form.append('reqtype', 'fileupload');
   form.append('time', '72h');
   form.append('fileToUpload', file);
+  const timeout = Math.min(600000, Math.max(90000, Math.ceil(file.size / 1024 / 8) * 1000));
   const resp = await fetchWithTimeout(
     'https://litterbox.catbox.moe/resources/internals/api.php',
     { method: 'POST', body: form },
-    90000
+    timeout
   );
   if (!resp.ok) throw new Error(`litterbox HTTP ${resp.status}`);
   const url = (await resp.text()).trim();
